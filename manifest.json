@@ -1,0 +1,11 @@
+{
+	"id": "calc-craft",
+	"name": "CalcCraft",
+	"version": "1.1.0",
+	"minAppVersion": "0.15.0",
+	"description": "have formulas like in excel a1+a2, or sum()",
+	"author": "klaudyu",
+	"authorUrl": "https://www.instagram.com/klaudyul/",
+	"fundingUrl": "https://buymeacoffee.com/klaudyul",
+	"isDesktopOnly": false
+}

@@ -1,0 +1,135 @@
+/* For column headers */
+th::before {
+    content: attr(data-col-label);
+    position: absolute;
+    font-size: smaller;
+    color: gray;
+    transform: translate(0px, -12px); 
+}
+
+
+td {
+    height:1.5em;
+}
+
+/* For row headers for td */
+tr td:first-child::before {
+    content: attr(data-row-label);
+    position: absolute;
+    font-size: smaller;
+    color: gray;
+    #background-color:white;
+    transform: translate(-16px, 0px);  
+}
+
+
+/**********formula cell************/
+/*light theme*/
+.markdown-rendered .formula-cell-borderenabled {
+  #border:var(--CalcCraft-formula-borders);
+  border:2px double;
+}
+.markdown-rendered .formula-cell-colorenabled {
+  background-color: var(--CalcCraft_formula_background_color_light)!important ;  /* Light gray background */
+  color:var(--CalcCraft_formula_font_color_light)!important;
+  #border:2px double;
+  #border:var(--CalcCraft-formula-borders);
+  #font-style: italic;  /* Italic text */
+}
+/*dark theme*/
+.theme-dark .markdown-rendered .formula-cell-colorenabled{
+    background-color: var(--CalcCraft_formula_background_color_dark)!important;   
+    color:var(--CalcCraft_formula_font_color_dark)!important;
+}
+
+
+/**********matrix  cell************/
+
+
+.markdown-rendered .matrix-cell-colorenabled {
+  background-color: var(--CalcCraft_formula_background_matrix_light)!important ;  /* Light gray background */
+  color:var(--CalcCraft_formula_font_matrix_light)!important;
+  #border:2px double;
+  #font-style: italic;  /* Italic text */
+}
+.theme-dark .markdown-rendered .matrix-cell-colorenabled {
+  background-color: var(--CalcCraft_formula_background_matrix_dark)!important ;  /* Light gray background */
+  color:var(--CalcCraft_formula_font_matrix_dark)!important;
+}
+
+td.label-cell.column {
+    border: none;
+    color: gray;
+    font-size: 80%;
+    text-align: center;
+    vertical-align: bottom;
+    padding:.1em;
+}
+
+td.label-cell.row {
+    border: none !important;
+    color: gray;
+    font-size: 80%;
+    text-align: right;
+    vertical-align: middle;
+    padding:.2em;
+}
+
+
+/**************** error cells**************/
+.markdown-rendered .error-cell-colorenabled{
+    background-color: var(--CalcCraft_formula_background_error_light)!important ; 
+    color:var(--CalcCraft_formula_font_error_light)!important
+}
+.theme-dark .markdown-rendered .error-cell-colorenabled{
+    background-color: var(--CalcCraft_formula_background_error_dark)!important ;
+    color:var(--CalcCraft_formula_font_error_dark)!important;
+}
+
+
+/*********** parents cells***************/
+.markdown-rendered .cell-parents-highlight {
+    background-color: var(--CalcCraft_formula_background_parents_light)!important;
+    color:var(--CalcCraft_formula_font_parents_light)!important;
+}
+.theme-dark .markdown-rendered .formula-cell.error-cell.cell-parents-highlight,
+.theme-dark  .markdown-rendered .cell-parents-highlight {
+    background-color: var(--CalcCraft_formula_background_parents_dark)!important;
+    color:var(--CalcCraft_formula_font_parents_dark)!important;
+}
+
+
+/* children cells*/
+/* light theme*/
+.markdown-rendered .formula-cell.error-cell.cell-children-highlight,
+.markdown-rendered .cell-children-highlight {
+    background-color: var(--CalcCraft_formula_background_children_light)!important;
+    color:var(--CalcCraft_formula_font_children_light)!important;
+}
+.theme-dark .markdown-rendered .formula-cell.error-cell.cell-children-highlight,
+.theme-dark  .markdown-rendered .cell-children-highlight {
+    background-color: var(--CalcCraft_formula_background_children_dark)!important;
+    color:var(--CalcCraft_formula_font_children_dark)!important;
+}
+
+
+
+/*active class*/
+.markdown-rendered td.cell-active{
+    #border-radius: 50%;
+    text-decoration: underline;
+}
+
+
+th, td {
+    #position: relative;
+}
+
+table, th, td {
+    #overflow: visible!important;
+}
+
+table{
+   margin:10px;
+}
+
