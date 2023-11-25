@@ -31,10 +31,9 @@ export const DefaultSettings = {
 	formula_font_children_dark: "#dcffa8"
 };
 
-
 export class CalcCraftSettingsTab extends PluginSettingTab {
 	plugin: CalcCraftPlugin;
-    
+
 	constructor(app: App, plugin: CalcCraftPlugin) {
 		super(app, plugin);
 	}
@@ -43,10 +42,6 @@ export class CalcCraftSettingsTab extends PluginSettingTab {
 		const { containerEl } = this;
 
 		containerEl.empty();
-
-		this.containerEl.createEl("h3", {
-			text: "General"
-		});
 
 		new Setting(containerEl)
 			.setName("how many decimals")
@@ -166,7 +161,7 @@ export class CalcCraftSettingsTab extends PluginSettingTab {
 	}
 
 	reloadPages() {
-        this.app.workspace.getLeavesOfType('markdown').forEach( e => e.rebuildView())
+		this.app.workspace.getLeavesOfType("markdown").forEach(e => e.rebuildView());
 	}
 
 	createColorpicker_fg_bg(containerEl, name, description, colorfg, colorbg) {

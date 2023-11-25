@@ -15,7 +15,6 @@ enum cellstatus {
 	iscomputed
 }
 
-
 class InfiniteLoop extends Error {
 	constructor(message) {
 		super(message);
@@ -42,15 +41,15 @@ export default class CalcCraftPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 		this.registerMarkdownPostProcessor(this.postProcessor.bind(this));
-        this.settings_tab=new CalcCraftSettingsTab(this.app, this)
+		this.settings_tab = new CalcCraftSettingsTab(this.app, this);
 		this.addSettingTab(this.settings_tab);
 		this.debug("table formula plugin loaded");
-        this.settings_tab.reloadPages();
+		this.settings_tab.reloadPages();
 	}
 
-    async onunload(): void {
-        this.settings_tab.reloadPages();
-    }
+	async onunload(): void {
+		this.settings_tab.reloadPages();
+	}
 
 	bool2nr(value) {
 		return typeof value === "boolean" ? +value : value;
@@ -526,7 +525,9 @@ export default class CalcCraftPlugin extends Plugin {
 		for (let i = 0; i <= existingCells.length; i++) {
 			const newCell = newRow.insertCell(i);
 			if (i > this.colOffset)
-				newCell.innerHTML = String.fromCharCode("a".charCodeAt(0) + i - 1 - this.colOffset);
+				newCell.textContent = String.fromCharCode(
+					"a".charCodeAt(0) + i - 1 - this.colOffset
+				);
 			newCell.classList.add("label-cell", "column");
 			newCell.CalcCraft = { parents: [], children: [] };
 		}
@@ -535,7 +536,7 @@ export default class CalcCraftPlugin extends Plugin {
 		rows.forEach((row, index) => {
 			const newCell = row.insertCell(0);
 			if (index + 1 - this.rowOffset > 0) {
-				newCell.innerHTML = index + 1 - this.rowOffset; // Row numbers start from 1
+				newCell.textContent = (index + 1 - this.rowOffset).toString();
 			}
 			newCell.classList.add("label-cell", "row");
 			newCell.CalcCraft = { parents: [], children: [] };
@@ -660,7 +661,12 @@ export default class CalcCraftPlugin extends Plugin {
 							if (this.settings.formula_background_error_toggle) {
 								cellEl.classList.add("error-cell-colorenabled");
 							}
-							cellEl.innerHTML = "" + this.errors[rowIndex][colIndex];
+							//simulate <br> by breaking the text
+							cellEl.textContent = '';
+							this.errors[rowIndex][colIndex].split('<br>').forEach((text, index, array) => {
+								cellEl.appendChild(document.createTextNode(text));
+								if (index < array.length - 1) cellEl.appendChild(document.createElement('br'));
+							});
 						}
 					} else {
 						if (this.celltype[rowIndex][colIndex] === celltype.matrix) {
@@ -668,9 +674,9 @@ export default class CalcCraftPlugin extends Plugin {
 							if (this.settings.formula_background_matrix_toggle) {
 								cellEl.classList.add("matrix-cell-colorenabled");
 							}
+							this.putDataInHtml(cellEl, rowIndex, colIndex);
 						}
 						//cellEl.textContent=this.tableData[rowIndex][colIndex];
-						this.putDataInHtml(cellEl, rowIndex, colIndex);
 					}
 					//for higlighting ; only formulas or matrices;FIXME add condition
 					this.parents[rowIndex][colIndex].forEach(([depRow, depCol]) => {
@@ -768,6 +774,7 @@ export default class CalcCraftPlugin extends Plugin {
 	}
 
 	putDataInHtml(cellEl, rowIndex, colIndex) {
+		//debugger;
 		let data = this.tableData[rowIndex][colIndex];
 		if (typeof data === "number" && this.settings.precision >= 0) {
 			const decimalPart = String(data).split(".")[1];
@@ -775,8 +782,8 @@ export default class CalcCraftPlugin extends Plugin {
 				data = data.toFixed(this.settings.precision);
 			}
 		}
-		//cellEl.textContent = String(data);
 		cellEl.textContent = data;
+		//cellEl.textContent = String(data);
 	}
 
 	async loadSettings() {
