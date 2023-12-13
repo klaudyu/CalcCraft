@@ -2,6 +2,7 @@ import { PluginSettingTab, Setting } from "obsidian";
 
 export const DefaultSettings = {
 	precision: "-1",
+	groupdigits: false,
 	showLabels: true,
 	formula_background_color_toggle: true,
 	showBorders: true,
@@ -56,6 +57,17 @@ export class CalcCraftSettingsTab extends PluginSettingTab {
 						this.reloadPages();
 					})
 			);
+		new Setting(containerEl)
+			.setName("digit grouping")
+			.setDesc("digit grouping")
+			.addToggle(toggle =>
+				toggle.setValue(this.plugin.settings.groupdigits).onChange(async value => {
+					this.plugin.settings.groupdigits = value;
+					await this.plugin.saveSettings();
+					this.reloadPages();
+				})
+			);
+
 		new Setting(containerEl)
 			.setName("show labels")
 			.setDesc("show labels.")

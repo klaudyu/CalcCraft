@@ -662,11 +662,14 @@ export default class CalcCraftPlugin extends Plugin {
 								cellEl.classList.add("error-cell-colorenabled");
 							}
 							//simulate <br> by breaking the text
-							cellEl.textContent = '';
-							this.errors[rowIndex][colIndex].split('<br>').forEach((text, index, array) => {
-								cellEl.appendChild(document.createTextNode(text));
-								if (index < array.length - 1) cellEl.appendChild(document.createElement('br'));
-							});
+							cellEl.textContent = "";
+							this.errors[rowIndex][colIndex]
+								.split("<br>")
+								.forEach((text, index, array) => {
+									cellEl.appendChild(document.createTextNode(text));
+									if (index < array.length - 1)
+										cellEl.appendChild(document.createElement("br"));
+								});
 						}
 					} else {
 						if (this.celltype[rowIndex][colIndex] === celltype.matrix) {
@@ -776,10 +779,13 @@ export default class CalcCraftPlugin extends Plugin {
 	putDataInHtml(cellEl, rowIndex, colIndex) {
 		//debugger;
 		let data = this.tableData[rowIndex][colIndex];
-		if (typeof data === "number" && this.settings.precision >= 0) {
-			const decimalPart = String(data).split(".")[1];
-			if (decimalPart && decimalPart.length > this.settings.precision) {
-				data = data.toFixed(this.settings.precision);
+		if (typeof data === "number") {
+			if (this.settings.precision >= 0) {
+				data = parseFloat(data.toFixed(this.settings.precision));
+			}
+			if (this.settings.groupdigits) {
+				let locale = navigator.language || navigator.userLanguage;
+				data = Intl.NumberFormat(locale).format(data).toString();
 			}
 		}
 		cellEl.textContent = data;
