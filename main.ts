@@ -662,11 +662,14 @@ export default class CalcCraftPlugin extends Plugin {
 								cellEl.classList.add("error-cell-colorenabled");
 							}
 							//simulate <br> by breaking the text
-							cellEl.textContent = '';
-							this.errors[rowIndex][colIndex].split('<br>').forEach((text, index, array) => {
-								cellEl.appendChild(document.createTextNode(text));
-								if (index < array.length - 1) cellEl.appendChild(document.createElement('br'));
-							});
+							cellEl.textContent = "";
+							this.errors[rowIndex][colIndex]
+								.split("<br>")
+								.forEach((text, index, array) => {
+									cellEl.appendChild(document.createTextNode(text));
+									if (index < array.length - 1)
+										cellEl.appendChild(document.createElement("br"));
+								});
 						}
 					} else {
 						if (this.celltype[rowIndex][colIndex] === celltype.matrix) {
