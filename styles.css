@@ -7,11 +7,6 @@ th::before {
     transform: translate(0px, -12px); 
 }
 
-
-td {
-    height:1.5em;
-}
-
 /* For row headers for td */
 tr td:first-child::before {
     content: attr(data-row-label);
