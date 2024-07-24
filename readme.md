@@ -17,7 +17,7 @@ most of the functions from
 #### Spreadsheet like references
 If the result is a vector or a matrix the output will be expanded to multiple cells, and the references for those cells are recomputed.
 The references supported are in `[a-z][0-9]+` format (lowercase)
-Besides this `a1` reference style, the cells can be referenced using colum-row notation: `[0-9]+c[0-9]r`, where `c` stands for column and `r` stands for row. So for addressing the `b3` cell we could also write `2c3r` (column 2, row 3).
+Besides this `a1` reference style, the cells can be referenced using colum-row notation: `[0-9]c[0-9]r`, where `c` stands for column and `r` stands for row. So for addressing the `b3` cell we could also write `2c3r` (column 2, row 3).
 The column-row notation supports also relative referencing by adding a `+` or `-` before the number. 
 Combinations of the two are possible:
 - `=b+3r` cell at column `b` , 3 rows down.
