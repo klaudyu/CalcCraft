@@ -1,8 +1,8 @@
-import { Plugin, MarkdownPostProcessorContext } from "obsidian";
+import { Plugin, MarkdownPostProcessorContext, App } from "obsidian";
 import { evaluate } from "mathjs";
 import { CalcCraftSettingsTab, DefaultSettings } from "settings";
 
-const debug = false;
+const debug = true;
 
 enum celltype {
 	number = 1,
@@ -16,26 +16,29 @@ enum cellstatus {
 }
 
 class InfiniteLoop extends Error {
-	constructor(message) {
+	constructor(message: string) {
 		super(message);
 		this.name = "InfiniteLoop";
 	}
 }
 
 export default class CalcCraftPlugin extends Plugin {
-	tableData = [];
-	formulaData = [];
-	celltype = [];
-	cellstatus = [];
-	errors = [];
-	parents = [];
-	children = [];
-	settings = [];
-	cssVariables = [];
+	tableData: any[][] = [];
+	formulaData: any[][] = [];
+	celltype: celltype[][] = [];
+	cellstatus: cellstatus[][] = [];
+	errors: (string | null)[][] = [];
+	parents: [number, number][][][] = [];
+	children: [number, number][][][] = [];
+	settings: any = {};
+	settings_tab: CalcCraftSettingsTab;
+	cssVariables: string[] = [];
+	maxcols: number = 0;
+	maxrows: number = 0;
 	colOffset = 0;
 	rowOffset = 0;
-	htmlTable = [];
-	countComputed = [];
+	htmlTable: HTMLElement[][] = [];
+	countComputed: number[][] = [];
 	useBool = false; //keep true and false, otherwise convert them to 0 and 1
 
 	async onload() {
@@ -47,19 +50,19 @@ export default class CalcCraftPlugin extends Plugin {
 		this.settings_tab.reloadPages();
 	}
 
-	async onunload(): void {
+	async onunload(): Promise<void> {
 		this.settings_tab.reloadPages();
 	}
 
-	bool2nr(value) {
+	bool2nr(value: any): any {
 		return typeof value === "boolean" ? +value : value;
 	}
 
-	cords2ref(row, col) {
+	cords2ref(row: number, col: number): string {
 		const colStr = String.fromCharCode("a".charCodeAt(0) + col);
 		return colStr + (row + 1);
 	}
-	ref2cords(ref, formulaRow = 0, formulaCol = 0) {
+	ref2cords(ref: string, formulaRow = 0, formulaCol = 0): [number, number] | null {
 		//const match = ref.match(/^([a-z]|([+-]?\d+c))([+-]?\d+r|\d+)$/);
 		const match = ref.match(/^([a-z]+|([+-]?)\d+c)(\d+|([+-]?)\d+r)$/);
 
@@ -90,14 +93,14 @@ export default class CalcCraftPlugin extends Plugin {
 		return [row, col];
 	}
 
-	letter2col(letter) {
+	letter2col(letter: string): number {
 		return letter.charCodeAt(0) - "a".charCodeAt(0);
 	}
-	number2row(nr) {
+	number2row(nr: number): number {
 		return nr - 1;
 	}
 
-	copyArrayValues(sourceArray: [][], targetArray: [][], row: number, col: number) {
+	copyArrayValues(sourceArray: any[][], targetArray: any[][], row: number, col: number): void {
 		for (let i = 0; i < sourceArray.length; i++) {
 			for (let j = 0; j < sourceArray[i].length; j++) {
 				// Check for out-of-bounds
@@ -141,7 +144,7 @@ export default class CalcCraftPlugin extends Plugin {
 			this.cellstatus[row][col] = cellstatus.computing;
 			const formula = this.formulaData[row][col].slice(1); //skip the `=`
 			if (debug) {
-				this.debug(`we are asked to fill in at ${row},${col} with formula: ${formula}`);
+				this.debug(`we are asked to fill in at ${this.cords2ref(row,col)} with formula: ${formula}`);
 			}
 			//this.formulaData[row][col] = null;
 			let processedformula;
@@ -161,10 +164,7 @@ export default class CalcCraftPlugin extends Plugin {
 				this.debug(`we will evaluate the formula: ${processedformula}`);
 				const result = evaluate(processedformula);
 				this.debug(
-					`we were asked to fill in at ${this.cords2ref(
-						row,
-						col
-					)} with formula: ${formula} ; the result is ${result}`
+					`we were asked to fill in at ${this.cords2ref( row, col)} with formula: ${formula} ; the result is ${result}`
 				);
 
 				if (result.constructor.name === "Unit") {
@@ -195,7 +195,7 @@ export default class CalcCraftPlugin extends Plugin {
 		}
 	}
 
-	fillInMatrix(row, col, parsed) {
+	fillInMatrix(row: number, col: number, parsed: any): any {
 		//now we got a matrix or vector we have to clear recompute the values of all the
 		// children of these cells, but not on the main cell
 		// normally if a cell depends on another cell first it asks it to calculate itself
@@ -206,9 +206,9 @@ export default class CalcCraftPlugin extends Plugin {
 		//FIXME: if a cell is asked to recompute it's values
 		// now we add the children twice. should keep track, of
 		// how many times we compute and only first time add children
-		const ismatrix = parsed.every(item => Array.isArray(item));
+		const ismatrix = parsed.every((item: any) => Array.isArray(item));
 		//if (!ismatrix) parsed=[parsed];
-		if (!ismatrix) parsed = parsed.map(n => [n]);
+		if (!ismatrix) parsed = parsed.map((n: any) => [n]);
 
 		this.copyArrayValues(parsed, this.tableData, row, col);
 		//we assume here that this cell is computed
@@ -216,8 +216,8 @@ export default class CalcCraftPlugin extends Plugin {
 
 		//then we clean all the children of the values that were
 		//overwritten by writing the matrix
-		parsed.forEach((parsedrow, i) => {
-			parsedrow.forEach((_, j) => {
+		parsed.forEach((parsedrow: any, i: number) => {
+			parsedrow.forEach((_: any, j: number) => {
 				if (row + i < this.tableData.length && col + j < this.tableData[0].length) {
 					if (i || j) {
 						//if this cell contained a formula we delete it and also the parents
@@ -263,8 +263,8 @@ export default class CalcCraftPlugin extends Plugin {
 		//now that we filled the values in, we can recompute the children
 		//we only have to call getValueByCoordinates for each child and child's child
 		//basically all cells that depend on this range that got overwritten by the matrix
-		parsed.forEach((tmprow, i) => {
-			tmprow.forEach((tmpcell, j) => {
+		parsed.forEach((tmprow: any, i: number) => {
+			tmprow.forEach((tmpcell: any, j: number) => {
 				if (
 					(i || j) &&
 					row + i < this.tableData.length &&
@@ -279,7 +279,7 @@ export default class CalcCraftPlugin extends Plugin {
 		return parsed[0][0];
 	}
 
-	cleanupchildren([row, col], [rootRow, rootCol], i = 0) {
+	cleanupchildren([row, col]: [number, number], [rootRow, rootCol]: [number, number], i = 0): void {
 		//set the parents for [row,col] and its parents computed to none
 		//the whole process was initiated by the matrix formula at rootRow,rootCol
 		//so if, one of the children or children of chilren,...
@@ -304,7 +304,7 @@ export default class CalcCraftPlugin extends Plugin {
 			}
 		});
 	}
-	computechildren(row, col, i = 0) {
+	computechildren(row: number, col: number, i = 0): void {
 		this.debug(
 			`recomputing the children of ${this.cords2ref(row, col)}: ${this.children[row][col]
 				.map(([r, c]) => this.cords2ref(r, c))
@@ -324,14 +324,16 @@ export default class CalcCraftPlugin extends Plugin {
 		});
 	}
 
-	debug(message) {
+	debug(message: any): void {
 		if (debug) {
 			console.log(message);
 		}
 	}
 
 	getValuebyReference(ref: string, formulaRow = 0, formulaCol = 0): string | number {
-		const [row, col] = this.ref2cords(ref, formulaRow, formulaCol);
+		const coords = this.ref2cords(ref, formulaRow, formulaCol);
+		if (!coords) throw new Error("invalid cell reference");
+		const [row, col] = coords;
 		if (row < 0 || row > this.maxrows - 1 || col < 0 || col > this.maxcols - 1) {
 			throw new Error("cell<br>out of<br>table");
 		}
@@ -339,10 +341,10 @@ export default class CalcCraftPlugin extends Plugin {
 
 		//this.debug(`{cords2ref[row,col]} is a parent of {cords2ref(formulaRow,formulaCol)}`);
 		this.children[row][col].push([formulaRow, formulaCol]);
-		return this.getValueByCoordinates(row, col, (formulaRow = 0), (formulaCol = 0));
+		return this.getValueByCoordinates(row, col);
 	}
 
-	findclosingbracket(formula) {
+	findclosingbracket(formula: string): string {
 		let counter = 1;
 		let pos = 0;
 
@@ -361,7 +363,7 @@ export default class CalcCraftPlugin extends Plugin {
 		//also for puting asside the reference list for higlighting
 		const [formulaRow, formulaCol] = pos;
 
-		this.debug(`we parsefunction; location:${formulaRow},${formulaCol}`);
+		this.debug(`we parsefunction; ${this.cords2ref(formulaRow,formulaCol)} (location:${formulaRow},${formulaCol})`);
 		let i = 0;
 		let results = "";
 
@@ -408,16 +410,22 @@ export default class CalcCraftPlugin extends Plugin {
 					this.debug(`we matched a range`);
 					i += matchRange[0].length - 1;
 					const [start, end] = matchRange[0].split(":"); // Split the range into start and end
-					const [startRow, startCol] = this.ref2cords(start, formulaRow, formulaCol);
-					const [endRow, endCol] = this.ref2cords(end, formulaRow, formulaCol);
+					const startCoords = this.ref2cords(start, formulaRow, formulaCol);
+					const endCoords = this.ref2cords(end, formulaRow, formulaCol);
+					if (!startCoords || !endCoords) throw new Error("invalid range reference");
+					const [startRow, startCol] = startCoords;
+					const [endRow, endCol] = endCoords;
 					this.debug(`we look for range till ${this.cords2ref(endRow, endCol)}`);
 					results += this.unfoldRange(startRow, endRow, startCol, endCol, pos, false);
 				} else if (matchMatrix) {
 					this.debug(`we matched a matrix`);
 					i += matchMatrix[0].length - 1;
 					const [start, end] = matchMatrix[0].slice(1, -1).split(":"); // Split the range into start and end
-					const [startRow, startCol] = this.ref2cords(start, formulaRow, formulaCol);
-					const [endRow, endCol] = this.ref2cords(end, formulaRow, formulaCol);
+					const startCoords = this.ref2cords(start, formulaRow, formulaCol);
+					const endCoords = this.ref2cords(end, formulaRow, formulaCol);
+					if (!startCoords || !endCoords) throw new Error("invalid range reference");
+					const [startRow, startCol] = startCoords;
+					const [endRow, endCol] = endCoords;
 					this.debug(`we look for range till ${this.cords2ref(endRow, endCol)}`);
 					results += this.unfoldRange(startRow, endRow, startCol, endCol, pos, true);
 				} else if (matchRangeCol) {
@@ -440,8 +448,8 @@ export default class CalcCraftPlugin extends Plugin {
 					const [start, end] = matchRangeRow[0].split(":"); // Split the range into start and end
 					const startCol = 0;
 					const endCol = this.maxcols - 1;
-					const startRow = this.number2row(start);
-					const endRow = this.number2row(end);
+					const startRow = this.number2row(parseInt(start));
+					const endRow = this.number2row(parseInt(end));
 					results += this.unfoldRange(startRow, endRow, startCol, endCol, pos);
 				} else if (matchformula) {
 					this.debug(`we matched formula ${matchformula}`);
@@ -481,7 +489,7 @@ export default class CalcCraftPlugin extends Plugin {
 		return results;
 	}
 
-	unfoldRange(startRow, endRow, startCol, endCol, formulaPos = [0, 0], matrix = false) {
+	unfoldRange(startRow: number, endRow: number, startCol: number, endCol: number, formulaPos: [number, number] = [0, 0], matrix = false): string {
 		//unfold ranges; if matrix is set, return as array of arrays, otherwise, just as an array
 		const [formulaRow, formulaCol] = formulaPos; //for higlighting
 		[startRow, endRow] = startRow > endRow ? [endRow, startRow] : [startRow, endRow];
@@ -516,7 +524,7 @@ export default class CalcCraftPlugin extends Plugin {
 		return rangetxt;
 	}
 
-	createLabels(tableEl) {
+	createLabels(tableEl: HTMLTableElement): void {
 		const rows = Array.from(tableEl.querySelectorAll("tr"));
 		const newRow = tableEl.insertRow(0);
 		const existingCells = Array.from(rows[0].querySelectorAll("td, th"));
@@ -529,7 +537,7 @@ export default class CalcCraftPlugin extends Plugin {
 					"a".charCodeAt(0) + i - 1 - this.colOffset
 				);
 			newCell.classList.add("label-cell", "column");
-			newCell.CalcCraft = { parents: [], children: [] };
+			(newCell as any).CalcCraft = { parents: [], children: [] };
 		}
 
 		// For the new leftmost column in existing rows
@@ -539,7 +547,7 @@ export default class CalcCraftPlugin extends Plugin {
 				newCell.textContent = (index + 1 - this.rowOffset).toString();
 			}
 			newCell.classList.add("label-cell", "row");
-			newCell.CalcCraft = { parents: [], children: [] };
+			(newCell as any).CalcCraft = { parents: [], children: [] };
 		});
 	}
 
@@ -560,15 +568,15 @@ export default class CalcCraftPlugin extends Plugin {
 
 			//add the settings to the table, so we can check if we have to display
 			//the children and parents on mousehover
-			tableEl.CalcCraft = { settings: this.settings };
+			(tableEl as any).CalcCraft = { settings: this.settings };
 
 			const rows = Array.from(tableEl.querySelectorAll("tr")).slice(this.rowOffset);
 
 			rows.forEach((rowEl, i) => {
 				this.htmlTable[i] = [];
-				const cells = Array.from(rowEl.querySelectorAll("td, th")).slice(this.colOffset);
+				const cells = Array.from(rowEl.querySelectorAll("td, th")).slice(this.colOffset) as HTMLElement[];
 				cells.forEach((cellEl, j) => {
-					this.htmlTable[i][j] = cellEl;
+					this.htmlTable[i][j] = cellEl as HTMLElement;
 				});
 			});
 
@@ -591,7 +599,7 @@ export default class CalcCraftPlugin extends Plugin {
 				this.countComputed[rowIndex] = [];
 				for (let colIndex = 0; colIndex < row.length; colIndex++) {
 					const cellContent = this.htmlTable[rowIndex][colIndex].textContent || "";
-					this.cellstatus[rowIndex][colIndex] = null; //this will detect errors if we visit a  formula cell twice
+					this.cellstatus[rowIndex][colIndex] = cellstatus.none; //this will detect errors if we visit a  formula cell twice
 					this.errors[rowIndex][colIndex] = null; // this will store the errors
 					this.parents[rowIndex][colIndex] = []; //this will store the parents; only for higlighting
 					this.children[rowIndex][colIndex] = [];
@@ -621,6 +629,7 @@ export default class CalcCraftPlugin extends Plugin {
 			for (let i = 0; i < this.tableData.length; i++) {
 				for (let j = 0; j < this.tableData[i].length; j++) {
 					try {
+						this.debug(`WE GET THE ${this.cords2ref(i,j)}`)
 						this.getValueByCoordinates(i, j);
 					} catch (error) {
 						console.log(error);
@@ -639,7 +648,7 @@ export default class CalcCraftPlugin extends Plugin {
 					//this is the actual html cell, in which we store the parents and
 					//the children
 					const cellEl = this.htmlTable[rowIndex][colIndex];
-					cellEl.CalcCraft = { parents: [], children: [] };
+					(cellEl as any).CalcCraft = { parents: [], children: [] };
 
 					// Check if the cell content is a formula
 					if (this.celltype[rowIndex][colIndex] === celltype.formula) {
@@ -663,13 +672,16 @@ export default class CalcCraftPlugin extends Plugin {
 							}
 							//simulate <br> by breaking the text
 							cellEl.textContent = "";
-							this.errors[rowIndex][colIndex]
-								.split("<br>")
-								.forEach((text, index, array) => {
-									cellEl.appendChild(document.createTextNode(text));
-									if (index < array.length - 1)
-										cellEl.appendChild(document.createElement("br"));
-								});
+							const errorText = this.errors[rowIndex][colIndex];
+							if (errorText) {
+								errorText
+									.split("<br>")
+									.forEach((text, index, array) => {
+										cellEl.appendChild(document.createTextNode(text));
+										if (index < array.length - 1)
+											cellEl.appendChild(document.createElement("br"));
+									});
+							}
 						}
 					} else {
 						if (this.celltype[rowIndex][colIndex] === celltype.matrix) {
@@ -683,12 +695,12 @@ export default class CalcCraftPlugin extends Plugin {
 					}
 					//for higlighting ; only formulas or matrices;FIXME add condition
 					this.parents[rowIndex][colIndex].forEach(([depRow, depCol]) => {
-						cellEl.CalcCraft.parents.push(this.htmlTable[depRow][depCol]);
+						(cellEl as any).CalcCraft.parents.push(this.htmlTable[depRow][depCol]);
 					});
 
 					//for hilighting; all cells can have children
 					this.children[rowIndex][colIndex].forEach(([depRow, depCol]) => {
-						cellEl.CalcCraft.children.push(this.htmlTable[depRow][depCol]);
+						(cellEl as any).CalcCraft.children.push(this.htmlTable[depRow][depCol]);
 					});
 				}
 			}
@@ -697,10 +709,11 @@ export default class CalcCraftPlugin extends Plugin {
 
 			// Attach a single 'mouseover' event listener to the table
 			tableEl.addEventListener("mouseover", function (event) {
-				const cellEl = event.target.closest("td, th"); // Get the closest cell element to the event target
+				const target = event.target as HTMLElement;
+				const cellEl = target.closest("td, th") as HTMLElement; // Get the closest cell element to the event target
 				if (!cellEl) return; // No cell? Get outta here.
 				cellEl.classList.add("cell-active");
-				if (cellEl?.CalcCraft == undefined) return;
+				if ((cellEl as any)?.CalcCraft == undefined) return;
 
 				/*
                 let rect = cellEl.getBoundingClientRect();
@@ -729,15 +742,15 @@ export default class CalcCraftPlugin extends Plugin {
 					cellEl.classList.contains("formula-cell") ||
 					cellEl.classList.contains("matrix-cell")
 				) {
-					if (tableEl.CalcCraft.settings.formula_background_parents_toggle) {
-						cellEl.CalcCraft.parents.forEach(depCellEl => {
+					if ((tableEl as any).CalcCraft.settings.formula_background_parents_toggle) {
+						(cellEl as any).CalcCraft.parents.forEach((depCellEl: HTMLElement) => {
 							depCellEl.classList.add("cell-parents-highlight");
 							//console.log('we added some parents');
 						});
 					}
 				}
-				if (tableEl.CalcCraft.settings.formula_background_children_toggle) {
-					cellEl.CalcCraft.children?.forEach(depCellEl => {
+				if ((tableEl as any).CalcCraft.settings.formula_background_children_toggle) {
+					(cellEl as any).CalcCraft.children?.forEach((depCellEl: HTMLElement) => {
 						depCellEl.classList.add("cell-children-highlight");
 						//this.debug('we added some children');
 					});
@@ -746,7 +759,8 @@ export default class CalcCraftPlugin extends Plugin {
 
 			// Similar approach for 'mouseout'
 			tableEl.addEventListener("mouseout", function (event) {
-				const cellEl = event.target.closest("td, th"); // Get the closest cell element to the event target
+				const target = event.target as HTMLElement;
+				const cellEl = target.closest("td, th") as HTMLElement; // Get the closest cell element to the event target
 				if (!cellEl) return; // No cell? Get outta here.
 				cellEl.classList.remove("cell-active");
 
@@ -755,19 +769,19 @@ export default class CalcCraftPlugin extends Plugin {
                 if (existingSVG) {
                     existingSVG.remove();
                 }*/
-				if (cellEl?.CalcCraft == undefined) return;
+				if ((cellEl as any)?.CalcCraft == undefined) return;
 				if (
 					cellEl.classList.contains("formula-cell") ||
 					cellEl.classList.contains("matrix-cell")
 				) {
-					if (tableEl.CalcCraft.settings.formula_background_parents_toggle) {
-						cellEl.CalcCraft.parents.forEach(depCellEl => {
+					if ((tableEl as any).CalcCraft.settings.formula_background_parents_toggle) {
+						(cellEl as any).CalcCraft.parents.forEach((depCellEl: HTMLElement) => {
 							depCellEl.classList.remove("cell-parents-highlight");
 						});
 					}
 				}
-				if (tableEl.CalcCraft.settings.formula_background_children_toggle) {
-					cellEl.CalcCraft.children?.forEach(depCellEl => {
+				if ((tableEl as any).CalcCraft.settings.formula_background_children_toggle) {
+					(cellEl as any).CalcCraft.children?.forEach((depCellEl: HTMLElement) => {
 						depCellEl.classList.remove("cell-children-highlight");
 					});
 				}
@@ -776,8 +790,7 @@ export default class CalcCraftPlugin extends Plugin {
 		//console.log(this.countComputed);
 	}
 
-	putDataInHtml(cellEl, rowIndex, colIndex) {
-		//debugger;
+	putDataInHtml(cellEl: HTMLElement, rowIndex: number, colIndex: number): void {
 		let data = this.tableData[rowIndex][colIndex];
 		if (typeof data === "number" && this.settings.precision >= 0) {
 			const decimalPart = String(data).split(".")[1];
