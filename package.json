@@ -1,6 +1,6 @@
 {
 	"name": "CalcCraft-plugin",
-	"version": "1.0.1",
+	"version": "2.0.0",
 	"description": "this is an excel like plugin Obsidian (https://obsidian.md)",
 	"main": "main.js",
 	"scripts": {
@@ -25,9 +25,9 @@
 	"dependencies": {
 		"mathjs": "^11.11.2"
 	},
-    "prettier": {
-        "printWidth": 100,
-        "trailingComma": "none",
-        "arrowParens": "avoid"
-    }
+	"prettier": {
+		"printWidth": 100,
+		"trailingComma": "none",
+		"arrowParens": "avoid"
+	}
 }
