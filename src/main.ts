@@ -1,4 +1,5 @@
-import { Plugin, MarkdownPostProcessorContext, App } from "obsidian";
+//import { Plugin, MarkdownPostProcessorContext, App } from "obsidian";
+import { Plugin, MarkdownPostProcessorContext, App, MarkdownView, debounce } from "obsidian";
 import { CalcCraftSettingsTab, DefaultSettings } from "./settings";
 import { TableEvaluator } from "./table-evaluator";
 
@@ -13,17 +14,25 @@ export default class CalcCraftPlugin extends Plugin {
 	htmlTable: HTMLElement[][] = [];
 	useBool = false; //keep true and false, otherwise convert them to 0 and 1
 
+	private lpCleanup: Array<() => void> = [];
+
+
     async onload() {
         await this.loadSettings();
         this.registerMarkdownPostProcessor(this.postProcessor.bind(this));
         
         // ADD THIS LINE for edit mode support:
-        this.registerEditorExtension(this.createEditExtension());
+        //this.registerEditorExtension(this.createEditExtension());
         
         this.settings_tab = new CalcCraftSettingsTab(this.app, this);
         this.addSettingTab(this.settings_tab);
         this.debug("table formula plugin loaded");
         this.settings_tab.reloadPages();
+
+		// Add Live Preview support:
+		this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.attachLivePreviewHooks()));
+		this.registerEvent(this.app.workspace.on("layout-change", () => this.attachLivePreviewHooks()));
+		this.attachLivePreviewHooks();
     }
 
     createEditExtension() {
@@ -81,24 +90,72 @@ export default class CalcCraftPlugin extends Plugin {
         });
     }
 
-    // ADD this new method to extract table data:
-    private extractTableGrid(tableEl: HTMLTableElement): string[][] {
-        const rows = Array.from(tableEl.querySelectorAll("tr")).slice(this.rowOffset);
-        const gridData: string[][] = [];
+	private extractTableGrid(tableEl: HTMLTableElement): string[][] {
+    const rows = Array.from(tableEl.querySelectorAll("tr")).slice(this.rowOffset);
+    const gridData: string[][] = [];
 
-        rows.forEach((rowEl, i) => {
-            const cells = Array.from(rowEl.querySelectorAll("td, th")).slice(this.colOffset);
-            gridData[i] = [];
+    rows.forEach((rowEl, i) => {
+        const cells = Array.from(rowEl.querySelectorAll("td, th")).slice(this.colOffset);
+        gridData[i] = [];
+        
+        cells.forEach((cellEl, j) => {
+            // In Live Preview, content might be inside .table-cell-wrapper
+            const wrapper = cellEl.querySelector('.table-cell-wrapper');
+            let cellContent;
             
-            cells.forEach((cellEl, j) => {
-                gridData[i][j] = cellEl.textContent || "";
-            });
+            if (wrapper) {
+                // Live Preview mode - get content from wrapper
+                cellContent = wrapper.textContent || "";
+                console.log(`Live Preview cell [${i},${j}]:`, `"${cellContent}"`, {
+                    wrapperText: wrapper.textContent,
+                    wrapperHTML: wrapper.innerHTML,
+                    hasOverlay: wrapper.classList.contains('calc-overlay-cell'),
+                    dataDisplay: wrapper.dataset.calcDisplay
+                });
+            } else {
+                // Reading mode - get content normally
+                cellContent = cellEl.textContent || "";
+                console.log(`Reading mode cell [${i},${j}]:`, `"${cellContent}"`);
+            }
+            
+            gridData[i][j] = cellContent;
         });
+    });
 
-        return gridData;
-    }
+    return gridData;
+}
+
+private _extractTableGrid(tableEl: HTMLTableElement): string[][] {
+    const rows = Array.from(tableEl.querySelectorAll("tr")).slice(this.rowOffset);
+    const gridData: string[][] = [];
+
+    rows.forEach((rowEl, i) => {
+        const cells = Array.from(rowEl.querySelectorAll("td, th")).slice(this.colOffset);
+        gridData[i] = [];
+        
+        cells.forEach((cellEl, j) => {
+            const cellContent = cellEl.textContent || "";
+            gridData[i][j] = cellContent;
+            
+            // DEBUG: Log ALL cells with their positions
+            console.log(`Cell [${i},${j}] content:`, `"${cellContent}"`);
+            
+            // Extra debug for the problematic cell A2 (row 1, col 0)
+            if (i === 1 && j === 0) {
+                console.log("A2 DETAILED:", {
+                    textContent: cellEl.textContent,
+                    innerHTML: cellEl.innerHTML,
+                    title: cellEl.getAttribute('title')
+                });
+            }
+        });
+    });
+
+    return gridData;
+}
+
+
    // MODIFY your existing display logic into this method:
- //   private applyResultsToHTML(tableEl: HTMLTableElement, result: any, gridData: string[][]) {
 	private applyResultsToHTML(tableEl: HTMLTableElement, result: any, gridData: string[][], evaluator: TableEvaluator) {
         // Get HTML table structure
         this.htmlTable = [];
@@ -189,8 +246,30 @@ export default class CalcCraftPlugin extends Plugin {
         this.addTableEventListeners(tableEl);
     }
 
-
 	private setFormattedCellValue(cellEl: HTMLElement, value: any): void {
+    let data = value;
+    if (typeof data === "number" && this.settings.precision >= 0) {
+        const decimalPart = String(data).split(".")[1];
+        if (decimalPart && decimalPart.length > this.settings.precision) {
+            data = data.toFixed(this.settings.precision);
+        }
+    }
+
+    // Live Preview: overlay on the wrapper
+    const wrapper = cellEl.querySelector<HTMLElement>(".table-cell-wrapper");
+    if (wrapper) {
+        wrapper.dataset.calcDisplay = String(data);
+        wrapper.classList.add("calc-overlay-cell");
+        return;
+    }
+
+    // Reading view: write value directly
+    cellEl.textContent = String(data);
+}
+
+	
+
+	private _setFormattedCellValue(cellEl: HTMLElement, value: any): void {
 		let data = value;
 		if (typeof data === "number" && this.settings.precision >= 0) {
 			const decimalPart = String(data).split(".")[1];
@@ -198,6 +277,23 @@ export default class CalcCraftPlugin extends Plugin {
 				data = data.toFixed(this.settings.precision);
 			}
 		}
+
+		   // DEBUG: Check what's in the cell title/tooltip
+    const title = cellEl.getAttribute("title");
+    if (title) {
+        console.log("Cell title (original formula):", title);
+        console.log("Computed value:", data);
+    }
+
+		// Live Preview: overlay on the wrapper
+		const wrapper = cellEl.querySelector<HTMLElement>(".table-cell-wrapper");
+		if (wrapper) {
+			wrapper.dataset.calcDisplay = String(data);
+			wrapper.classList.add("calc-overlay-cell");
+			return; // <-- do NOT set textContent in Live Preview
+		}
+
+
 		cellEl.textContent = String(data);
 	}
 
@@ -315,5 +411,71 @@ export default class CalcCraftPlugin extends Plugin {
             console.log(message);
         }
     }
+
+
+
+
+	// Add these methods to your CalcCraftPlugin class in main.ts:
+
+private recomputeLivePreview = debounce(() => {
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    const root = (view as any)?.editor?.cm?.contentDOM as HTMLElement | undefined;
+    if (!root) return;
+    
+    this.debug("Recomputing Live Preview tables");
+    
+    // Reuse your existing processor here:
+    this.postProcessor(root, {} as any);
+}, 75, true);
+
+private attachLivePreviewHooks = () => {
+    this.detachLivePreviewHooks();
+
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    const root = (view as any)?.editor?.cm?.contentDOM as HTMLElement | undefined;
+    if (!root) {
+        this.debug("No Live Preview root found");
+        return;
+    }
+
+    this.debug("Attaching Live Preview hooks");
+
+    // Only trigger on blur (when user finishes editing), not on input
+    const onCellBlur = (e: Event) => {
+        const target = e.target as HTMLElement;
+        if (target?.closest(".cm-table-widget")) {
+            this.debug("Table cell blur detected, triggering recompute");
+            // Add a small delay to ensure the DOM is stable
+            setTimeout(() => this.recomputeLivePreview(), 50);
+        }
+    };
+    
+    // Remove the input listener that was causing issues
+    root.addEventListener("blur", onCellBlur, true);
+    this.lpCleanup.push(() => {
+        root.removeEventListener("blur", onCellBlur, true);
+    });
+
+    // Keep the mutation observer but make it less aggressive
+    const mo = new MutationObserver((mutations) => {
+        // Only recompute if mutations don't involve active editing
+        const hasActiveEdit = root.querySelector('.cm-table-widget .table-cell-wrapper:focus-within');
+        if (!hasActiveEdit) {
+            this.debug("DOM mutation detected (no active edit)");
+            requestAnimationFrame(this.recomputeLivePreview);
+        }
+    });
+    mo.observe(root, { childList: true, subtree: true });
+    this.lpCleanup.push(() => mo.disconnect());
+
+    // Initial pass
+    this.recomputeLivePreview();
+};
+
+private detachLivePreviewHooks = () => {
+    this.debug("Detaching Live Preview hooks");
+    this.lpCleanup.forEach(fn => fn());
+    this.lpCleanup = [];
+};
 
 }

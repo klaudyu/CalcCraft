@@ -128,3 +128,47 @@ table{
    margin:10px;
 }*/
 
+
+
+
+
+
+
+
+/* Add this to your styles.css file for Live Preview formula overlays */
+
+/* Hide original text when showing computed value */
+.cm-table-widget .table-cell-wrapper.calc-overlay-cell:not(:focus-within) {
+    position: relative; 
+    color: transparent;
+}
+
+/* Show computed value as overlay */
+.cm-table-widget .table-cell-wrapper.calc-overlay-cell:not(:focus-within)::after {
+    content: attr(data-calc-display);
+    position: absolute; 
+    inset: 0;
+    display: flex; 
+    align-items: center; 
+    white-space: pre;
+    color: var(--text-normal); 
+    pointer-events: none;
+    padding: 0 4px; /* Match table cell padding */
+}
+
+/* When focused (editing), show original formula */
+.cm-table-widget .table-cell-wrapper.calc-overlay-cell:focus-within {
+    color: var(--text-normal);
+}
+
+/* Style formula cells in Live Preview */
+.cm-table-widget .calc-overlay-cell:not(:focus-within) {
+    /*background-color: var(--CalcCraft_formula_background_color_light, #e0f2ff);*/
+    color: var(--CalcCraft_formula_font_color_light, #008bc7);
+}
+
+/* Dark theme support */
+.theme-dark .cm-table-widget .calc-overlay-cell:not(:focus-within) {
+    /*background-color: var(--CalcCraft_formula_background_color_dark, #393347);*/
+    color: var(--CalcCraft_formula_font_color_dark, #fffafa);
+}
