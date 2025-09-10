@@ -1,5 +1,5 @@
 import { PluginSettingTab, Setting } from "obsidian";
- import { buyMeACoffee, paypal, revolut } from "./support";
+import { buyMeACoffee, paypal, revolut } from "./support";
 
 export const DefaultSettings = {
 	precision: "-1",
