@@ -156,6 +156,24 @@ private _extractTableGrid(tableEl: HTMLTableElement): string[][] {
                 const error = result.errors[rowIndex]?.[colIndex];
                 const cellType = result.cellTypes[rowIndex]?.[colIndex];
 
+				// Clear all previous styling classes
+				cellEl.classList.remove(
+					"formula-cell",
+					"formula-cell-borderenabled",
+					"formula-cell-colorenabled",
+					"matrix-cell",
+					"matrix-cell-colorenabled",
+					"error-cell",
+					"error-cell-colorenabled"
+				);
+
+				// Clear overlay data for non-formula cells
+				const wrapper = cellEl.querySelector<HTMLElement>(".table-cell-wrapper");
+				if (wrapper) {
+					wrapper.classList.remove("calc-overlay-cell");
+					wrapper.removeAttribute("data-calc-display");
+				}
+
                 // Initialize CalcCraft metadata
                 (cellEl as any).CalcCraft = { 
                     parents: [], 
@@ -191,6 +209,20 @@ private _extractTableGrid(tableEl: HTMLTableElement): string[][] {
                     }
                     cellEl.setAttribute("title", cellContent);
 
+
+					// In applyResultsToHTML:
+					if (error) {
+						cellEl.classList.add("error-cell");
+						if (this.settings.formula_background_error_toggle) {
+							cellEl.classList.add("error-cell-colorenabled");
+						}
+						// Pass error as separate parameter
+						this.setFormattedCellValue(cellEl, computedValue, error);
+					} else {
+						this.setFormattedCellValue(cellEl, computedValue);
+					}
+
+					/*
                     if (error) {
                         cellEl.classList.add("error-cell");
                         if (this.settings.formula_background_error_toggle) {
@@ -204,7 +236,7 @@ private _extractTableGrid(tableEl: HTMLTableElement): string[][] {
                         });
                     } else {
                         this.setFormattedCellValue(cellEl, computedValue);
-                    }
+                    }*/
                 } else if (cellType === 3) { // matrix
                     cellEl.classList.add("matrix-cell");
                     if (this.settings.formula_background_matrix_toggle) {
@@ -220,37 +252,128 @@ private _extractTableGrid(tableEl: HTMLTableElement): string[][] {
     }
 
 
-	private addSimpleLabels(tableEl: HTMLTableElement): void {
-		// Check if we already added labels to avoid duplication
-		if (tableEl.hasAttribute('data-labels-added')) {
-			return;
+	private _addSimpleLabels(tableEl: HTMLTableElement): void {
+		if (tableEl.dataset.labelsAdded === 'true') return;
+		tableEl.dataset.labelsAdded = 'true';
+		const rows = Array.from(tableEl.querySelectorAll("tr"));
+		const newRow = tableEl.insertRow(0);
+		const existingCells = Array.from(rows[0].querySelectorAll("td, th"));
+
+		// For the new top row
+		for (let i = 0; i <= existingCells.length; i++) {
+			const newCell = newRow.insertCell(i);
+			if (i > this.colOffset)
+				newCell.textContent = String.fromCharCode(
+					"a".charCodeAt(0) + i - 1 - this.colOffset
+				);
+			newCell.classList.add("label-cell", "column");
+			(newCell as any).CalcCraft = { parents: [], children: [] };
 		}
 
-		// Mark that we've added labels
-		tableEl.setAttribute('data-labels-added', 'true');
-
-		// Add row numbers - simple text approach
-		const rows = tableEl.querySelectorAll('tbody tr');
+		// For the new leftmost column in existing rows
 		rows.forEach((row, index) => {
-			const firstCell = row.querySelector('td');
-			if (firstCell && !firstCell.hasAttribute('data-row-labeled')) {
-				firstCell.setAttribute('data-row-labeled', 'true');
-				firstCell.setAttribute('data-row-number', (index + 2).toString());
+			const newCell = row.insertCell(0);
+			if (index + 1 - this.rowOffset > 0) {
+				newCell.textContent = (index + 1 - this.rowOffset).toString();
 			}
+			newCell.classList.add("label-cell", "row");
+			(newCell as any).CalcCraft = { parents: [], children: [] };
 		});
+		this.rowOffset = 0; // Skip the first row (column labels)
+		this.colOffset = 0; // Skip the first column (row labels)
 
-		// Add column letters
-		const headerCells = tableEl.querySelectorAll('thead th');
-		headerCells.forEach((cell, index) => {
-			if (!cell.hasAttribute('data-col-labeled')) {
-				cell.setAttribute('data-col-labeled', 'true');
-				const letter = String.fromCharCode("a".charCodeAt(0) + index);
-				cell.setAttribute('data-col-letter', letter);
-			}
-		});
 	}
 
-	private setFormattedCellValue(cellEl: HTMLElement, value: any): void {
+	// Robust addSimpleLabels() - uses thead/tBodies to keep header vs body separate
+	// Paste this into your code or copy from the canvas doc.
+
+	private addSimpleLabels(tableEl: HTMLTableElement): void {
+		// avoid running twice
+		if (tableEl.dataset.labelsAdded === 'true') return;
+		tableEl.dataset.labelsAdded = 'true';
+		const thead = tableEl.tHead;
+		if (thead && thead.rows.length > 0) {
+			const headerRow = thead.rows[0];
+			Array.from(headerRow.cells).forEach((cell, colIndex) => {
+				if (!cell.dataset.colLabeled) {
+					cell.dataset.colLabeled = 'true';
+					cell.dataset.colLetter = String.fromCharCode(97 + colIndex); // 'a' + index
+				}
+			});
+		}
+		const tbody = tableEl.tBodies && tableEl.tBodies[0];
+		if (tbody) {
+			Array.from(tbody.rows).forEach((row, bodyIndex) => {
+				// use the first cell in the row (cells[0]) — won't touch header <th>s
+				const firstCell = row.cells[0];
+				if (firstCell && !firstCell.dataset.rowLabeled) {
+					firstCell.dataset.rowLabeled = 'true';
+
+					// compute the printed row number. If there is a THEAD, start from 2
+					// (so tbody row 0 -> table row 2). If no THEAD, start from 1.
+					const printed = thead ? bodyIndex + 2 : bodyIndex + 1;
+					firstCell.dataset.rowNumber = String(printed);
+				}
+			});
+		}
+	}
+
+/* Notes & tips:
+ - Using table.tHead and table.tBodies is safer than querySelectorAll because
+   it avoids accidentally selecting header cells found inside tbody or nested tables.
+ - Using dataset (cell.dataset.x) keeps attribute handling clean and is easier to read.
+ - If your table has multiple TBODY sections, iterate all of tableEl.tBodies instead of just the first.
+ - CSS should target thead th[data-col-letter] and tbody td[data-row-number] so header/body are separated.
+*/
+private setFormattedCellValue(cellEl: HTMLElement, value: any, error?: string): void {
+    let data = value;
+    if (typeof data === "number" && this.settings.precision >= 0) {
+        const decimalPart = String(data).split(".")[1];
+        if (decimalPart && decimalPart.length > this.settings.precision) {
+            data = data.toFixed(this.settings.precision);
+        }
+    }
+
+    // Live Preview: overlay on the wrapper
+    const wrapper = cellEl.querySelector<HTMLElement>(".table-cell-wrapper");
+    if (wrapper) {
+        // For errors, show error in overlay but preserve original formula in DOM
+        const displayValue = error || String(data);
+        wrapper.dataset.calcDisplay = displayValue;
+        wrapper.classList.add("calc-overlay-cell");
+        return;
+    }
+
+    // Reading view: write value directly
+    cellEl.textContent = error || String(data);
+}
+private __setFormattedCellValue(cellEl: HTMLElement, value: any, error?: string): void {
+    let data = value;
+    if (typeof data === "number" && this.settings.precision >= 0) {
+        const decimalPart = String(data).split(".")[1];
+        if (decimalPart && decimalPart.length > this.settings.precision) {
+            data = data.toFixed(this.settings.precision);
+        }
+    }
+
+    // Live Preview: overlay on the wrapper
+    const wrapper = cellEl.querySelector<HTMLElement>(".table-cell-wrapper");
+    if (wrapper) {
+        // For errors, show error in overlay but preserve original formula in DOM
+        const displayValue = error || String(data);
+        wrapper.dataset.calcDisplay = displayValue;
+        wrapper.classList.add("calc-overlay-cell");
+        
+        // NEVER modify the wrapper's textContent if there's an error
+        // The original formula should remain in the DOM
+        return;
+    }
+
+    // Reading view: write value directly (errors will be handled by CSS styling)
+    cellEl.textContent = error || String(data);
+}
+
+	private _setFormattedCellValue(cellEl: HTMLElement, value: any): void {
     let data = value;
     if (typeof data === "number" && this.settings.precision >= 0) {
         const decimalPart = String(data).split(".")[1];
