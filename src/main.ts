@@ -1,6 +1,6 @@
 import { Plugin, MarkdownPostProcessorContext, App } from "obsidian";
 import { evaluate } from "mathjs";
-import { CalcCraftSettingsTab, DefaultSettings } from "settings";
+import { CalcCraftSettingsTab, DefaultSettings } from "./settings";
 
 const debug = true;
 
