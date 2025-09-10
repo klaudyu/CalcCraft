@@ -46,32 +46,6 @@ export default class CalcCraftPlugin extends Plugin {
 
 
 
-	createLabels(tableEl: HTMLTableElement): void {
-		const rows = Array.from(tableEl.querySelectorAll("tr"));
-		const newRow = tableEl.insertRow(0);
-		const existingCells = Array.from(rows[0].querySelectorAll("td, th"));
-
-		// For the new top row
-		for (let i = 0; i <= existingCells.length; i++) {
-			const newCell = newRow.insertCell(i);
-			if (i > this.colOffset)
-				newCell.textContent = String.fromCharCode(
-					"a".charCodeAt(0) + i - 1 - this.colOffset
-				);
-			newCell.classList.add("label-cell", "column");
-			(newCell as any).CalcCraft = { parents: [], children: [] };
-		}
-
-		// For the new leftmost column in existing rows
-		rows.forEach((row, index) => {
-			const newCell = row.insertCell(0);
-			if (index + 1 - this.rowOffset > 0) {
-				newCell.textContent = (index + 1 - this.rowOffset).toString();
-			}
-			newCell.classList.add("label-cell", "row");
-			(newCell as any).CalcCraft = { parents: [], children: [] };
-		});
-	}
 
 
 	    // MODIFY your existing postProcessor method:
@@ -169,10 +143,9 @@ private _extractTableGrid(tableEl: HTMLTableElement): string[][] {
             });
         });
 
-        // Add labels if needed
-        if (this.settings.showLabels) {
-            this.createLabels(tableEl);
-        }
+		if (this.settings.showLabels) {
+			this.addSimpleLabels(tableEl);
+		}
 
         // Apply computed values and styling
         for (let rowIndex = 0; rowIndex < this.htmlTable.length; rowIndex++) {
@@ -245,6 +218,37 @@ private _extractTableGrid(tableEl: HTMLTableElement): string[][] {
         // Add event listeners for hover effects
         this.addTableEventListeners(tableEl);
     }
+
+
+	private addSimpleLabels(tableEl: HTMLTableElement): void {
+		// Check if we already added labels to avoid duplication
+		if (tableEl.hasAttribute('data-labels-added')) {
+			return;
+		}
+
+		// Mark that we've added labels
+		tableEl.setAttribute('data-labels-added', 'true');
+
+		// Add row numbers - simple text approach
+		const rows = tableEl.querySelectorAll('tbody tr');
+		rows.forEach((row, index) => {
+			const firstCell = row.querySelector('td');
+			if (firstCell && !firstCell.hasAttribute('data-row-labeled')) {
+				firstCell.setAttribute('data-row-labeled', 'true');
+				firstCell.setAttribute('data-row-number', (index + 2).toString());
+			}
+		});
+
+		// Add column letters
+		const headerCells = tableEl.querySelectorAll('thead th');
+		headerCells.forEach((cell, index) => {
+			if (!cell.hasAttribute('data-col-labeled')) {
+				cell.setAttribute('data-col-labeled', 'true');
+				const letter = String.fromCharCode("a".charCodeAt(0) + index);
+				cell.setAttribute('data-col-letter', letter);
+			}
+		});
+	}
 
 	private setFormattedCellValue(cellEl: HTMLElement, value: any): void {
     let data = value;
