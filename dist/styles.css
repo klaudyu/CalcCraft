@@ -111,31 +111,11 @@ td.label-cell.row {
 
 /*active class*/
 .markdown-rendered td.cell-active{
-    #border-radius: 50%;
     text-decoration: underline;
 }
 
 
-th, td {
-    #position: relative;
-}
 
-table, th, td {
-    #overflow: visible!important;
-}
-/*
-table{
-   margin:10px;
-}*/
-
-
-
-
-
-
-
-
-/* Add this to your styles.css file for Live Preview formula overlays */
 
 /* Hide original text when showing computed value */
 .cm-table-widget .table-cell-wrapper.calc-overlay-cell:not(:focus-within) {
@@ -156,34 +136,12 @@ table{
     padding: 0 4px; /* Match table cell padding */
 }
 
-/* When focused (editing), show original formula */
-.cm-table-widget .table-cell-wrapper.calc-overlay-cell:focus-within {
-    color: var(--text-normal);
+
+
+.table-wrapper table[data-labels-added]{
+    margin-left:1em;
 }
 
-/* Style formula cells in Live Preview */
-.cm-table-widget .calc-overlay-cell:not(:focus-within) {
-    /*background-color: var(--CalcCraft_formula_background_color_light, #e0f2ff);*/
-    color: var(--CalcCraft_formula_font_color_light, #008bc7);
-}
-
-/* Dark theme support */
-.theme-dark .cm-table-widget .calc-overlay-cell:not(:focus-within) {
-    /*background-color: var(--CalcCraft_formula_background_color_dark, #393347);*/
-    color: var(--CalcCraft_formula_font_color_dark, #fffafa);
-}
-
-
-
-
-
-/* Unified styling for both modes */
-table[data-labels-added] {
-    border-collapse: separate;
-    border-spacing: 0;
-    margin-left: 25px;
-    margin-top: 20px;
-}
 
 /* READING MODE - INLINE LABELS */
 .el-table table[data-labels-added] tbody tr td[data-row-number]::before {
@@ -237,9 +195,7 @@ table[data-labels-added] {
     background-color: #f5f5f5;
     border-radius: 2px;
     padding: 1px 2px;
-    left: 20px;
-
-}
+ 
 
 
 
@@ -255,5 +211,7 @@ table[data-labels-added] {
 }
 
 .calc-craft-row {
+    text-align: right !important;
+}calc-craft-row {
     text-align: right !important;
 }

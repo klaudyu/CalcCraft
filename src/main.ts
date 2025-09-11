@@ -1,8 +1,9 @@
-import { Plugin, MarkdownPostProcessorContext, App, MarkdownView, debounce } from "obsidian";
+// At the top of main.ts, add TFile to imports:
+import { Plugin, MarkdownPostProcessorContext, App, MarkdownView, debounce, TFile } from "obsidian";
 import { CalcCraftSettingsTab, DefaultSettings } from "./settings";
 import { TableEvaluator } from "./table-evaluator";
 
-const debug = false;
+const debug = true;
 
 export default class CalcCraftPlugin extends Plugin {
 	settings: any = {};
@@ -66,7 +67,7 @@ export default class CalcCraftPlugin extends Plugin {
             
             // Fallback methods
             if (!file && ctx.sourcePath) {
-                file = this.app.vault.getAbstractFileByPath(ctx.sourcePath);
+                file = this.app.vault.getAbstractFileByPath(ctx.sourcePath) as TFile;
             }
             
             if (!file) {
@@ -105,7 +106,8 @@ export default class CalcCraftPlugin extends Plugin {
                     }
                     
                     this.debug(`File: ${file.name}, Required: ${requiredClass}, Found: ${hasRequiredClass}`);
-                    this.debug(`Mode: ${activeView?.getMode()}, cssclass:`, cssclass, `cssclasses:`, cssclasses);
+					this.debug(`Mode: ${activeView?.getMode()}, cssclass: ${cssclass}, cssclasses: ${cssclasses}`);
+
                     
                     if (!hasRequiredClass) {
                         this.debug(`Skipping page - missing cssclass '${requiredClass}'`);
@@ -306,19 +308,57 @@ export default class CalcCraftPlugin extends Plugin {
 		}
 	}
 
+
 	private setFormattedCellValue(cellEl: HTMLElement, value: any, error?: string): void {
 		let data = value;
-		if (typeof data === "number" && this.settings.precision >= 0) {
+
+		// Handle mathjs Unit objects - check for the presence of unit-specific properties
+		if (typeof data === "object" && data !== null &&
+			(data.constructor?.name === "Unit" ||
+				(data.value !== undefined && data.units !== undefined))) {
+
+			if (this.settings.precision >= 0) {
+				// Use mathjs Unit's format method if available, or construct manually
+				if (typeof data.format === 'function') {
+					// Use mathjs built-in formatting
+					data = data.format({ precision: this.settings.precision });
+				} else {
+					// Manual formatting - extract value and format it
+					const formattedValue = data.value.toFixed(this.settings.precision);
+					// Use toString() and replace the value part
+					const unitString = data.toString();
+					const unitPart = unitString.replace(/^[\d.-]+\s*/, ''); // Remove the number part
+					data = `${formattedValue} ${unitPart}`;
+				}
+			} else {
+				// Convert Unit object to string using its toString method
+				data = data.toString();
+			}
+		} else if (typeof data === "number" && this.settings.precision >= 0) {
 			const decimalPart = String(data).split(".")[1];
 			if (decimalPart && decimalPart.length > this.settings.precision) {
 				data = data.toFixed(this.settings.precision);
+			}
+		} else if (typeof data === "string" && this.settings.precision >= 0) {
+			// Handle unit strings like "24.123456 kg" (fallback for non-mathjs units)
+			const unitMatch = data.match(/^(-?\d*\.?\d+)\s*(.*)$/);
+			if (unitMatch) {
+				const [, numberPart, unitPart] = unitMatch;
+				const num = parseFloat(numberPart);
+
+				if (!isNaN(num) && isFinite(num)) {
+					const decimalPart = numberPart.split(".")[1];
+					if (decimalPart && decimalPart.length > this.settings.precision) {
+						const formattedNumber = num.toFixed(this.settings.precision);
+						data = unitPart ? `${formattedNumber} ${unitPart}` : formattedNumber;
+					}
+				}
 			}
 		}
 
 		// Live Preview: overlay on the wrapper
 		const wrapper = cellEl.querySelector<HTMLElement>(".table-cell-wrapper");
 		if (wrapper) {
-			// For errors, show error in overlay but preserve original formula in DOM
 			const displayValue = error || String(data);
 			wrapper.dataset.calcDisplay = displayValue;
 			wrapper.classList.add("calc-overlay-cell");
@@ -488,7 +528,6 @@ export default class CalcCraftPlugin extends Plugin {
 
     setTimeout(() => {
         this.debug("Frontmatter changed, refreshing all markdown views");
-        
         // Same as settings tab does
         this.app.workspace.getLeavesOfType("markdown").forEach((e: any) => e.rebuildView());
     }, 100);

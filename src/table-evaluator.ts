@@ -278,9 +278,6 @@ export class TableEvaluator {
                         this.tableData[row][col] = result;
                         return result;
                     }
-                    if (Array.isArray(parsed)) {
-                        return this.fillInMatrix(row, col, parsed);
-                    }
                 }
 
                 this.cellstatus[row][col] = cellstatus.iscomputed;
@@ -568,7 +565,7 @@ export class TableEvaluator {
         endCol = Math.min(endCol, this.maxcols - 1);
 
         // Track units in this range
-        let detectedUnit = null;
+        let detectedUnit:string | null = null;
         const values = [];
 
         for (let r = startRow; r <= endRow; r++) {
