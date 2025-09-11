@@ -360,8 +360,142 @@ private refreshPageIfNeeded(file: TFile) {
 		}
 	}
 
+	// Add this helper function to main.ts CalcCraftPlugin class:
+	private formatNumberWithGrouping(value: number): string {
+		if (!this.settings.digitGrouping) {
+			return value.toString();
+		}
 
+		// Handle precision first
+		let formattedValue = value;
+		if (this.settings.precision >= 0) {
+			formattedValue = parseFloat(value.toFixed(this.settings.precision));
+		}
+
+		const valueStr = formattedValue.toString();
+		const parts = valueStr.split('.');
+		const integerPart = parts[0];
+		const decimalPart = parts[1];
+
+		// Add grouping to integer part
+		const grouped = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, this.settings.groupingSeparator);
+
+		return decimalPart ? `${grouped}.${decimalPart}` : grouped;
+	}
+
+	// Update the setFormattedCellValue method in main.ts:
 	private setFormattedCellValue(cellEl: HTMLElement, value: any, error?: string): void {
+		let data = value;
+
+		// Handle mathjs Unit objects
+		if (typeof data === "object" && data !== null &&
+			(data.constructor?.name === "Unit" ||
+				(data.value !== undefined && data.units !== undefined))) {
+
+			if (this.settings.precision >= 0 || this.settings.digitGrouping) {
+				if (typeof data.format === 'function') {
+					// For mathjs Unit objects, we need to handle formatting manually
+					const unitValue = data.value;
+					const unitString = data.toString();
+					const unitPart = unitString.replace(/^[\d.-]+\s*/, ''); // Remove the number part
+
+					let formattedNumber;
+					if (this.settings.precision >= 0) {
+						formattedNumber = unitValue.toFixed(this.settings.precision);
+					} else {
+						formattedNumber = unitValue.toString();
+					}
+
+					if (this.settings.digitGrouping) {
+						formattedNumber = this.formatNumberWithGrouping(parseFloat(formattedNumber));
+					}
+
+					data = `${formattedNumber} ${unitPart}`;
+				} else {
+					data = data.toString();
+				}
+			} else {
+				data = data.toString();
+			}
+		} else if (typeof data === "number") {
+			// Handle plain numbers
+			if (this.settings.precision >= 0 || this.settings.digitGrouping) {
+				let formattedNumber = data;
+
+				// Apply precision first
+				if (this.settings.precision >= 0) {
+					const decimalPart = String(data).split(".")[1];
+					if (decimalPart && decimalPart.length > this.settings.precision) {
+						formattedNumber = parseFloat(data.toFixed(this.settings.precision));
+					}
+				}
+
+				// Apply digit grouping
+				if (this.settings.digitGrouping) {
+					data = this.formatNumberWithGrouping(formattedNumber);
+				} else {
+					data = formattedNumber;
+				}
+			}
+		} else if (typeof data === "string") {
+			// Handle unit strings (fallback for non-mathjs units)
+			const unitMatch = data.match(/^(-?\d*\.?\d+)\s*(.*)$/);
+			if (unitMatch) {
+				const [, numberPart, unitPart] = unitMatch;
+				let num = parseFloat(numberPart);
+
+				if (!isNaN(num) && isFinite(num)) {
+					// Apply precision
+					if (this.settings.precision >= 0) {
+						const decimalPart = numberPart.split(".")[1];
+						if (decimalPart && decimalPart.length > this.settings.precision) {
+							num = parseFloat(num.toFixed(this.settings.precision));
+						}
+					}
+
+					// Apply digit grouping
+					let formattedNumber;
+					if (this.settings.digitGrouping) {
+						formattedNumber = this.formatNumberWithGrouping(num);
+					} else {
+						formattedNumber = num.toString();
+					}
+
+					data = unitPart ? `${formattedNumber} ${unitPart}` : formattedNumber;
+				}
+			} else if (!isNaN(parseFloat(data)) && isFinite(parseFloat(data))) {
+				// Plain number string
+				let num = parseFloat(data);
+
+				if (this.settings.precision >= 0) {
+					const decimalPart = data.split(".")[1];
+					if (decimalPart && decimalPart.length > this.settings.precision) {
+						num = parseFloat(num.toFixed(this.settings.precision));
+					}
+				}
+
+				if (this.settings.digitGrouping) {
+					data = this.formatNumberWithGrouping(num);
+				} else {
+					data = num.toString();
+				}
+			}
+		}
+
+		// Live Preview: overlay on the wrapper
+		const wrapper = cellEl.querySelector<HTMLElement>(".table-cell-wrapper");
+		if (wrapper) {
+			const displayValue = error || String(data);
+			wrapper.dataset.calcDisplay = displayValue;
+			wrapper.classList.add("calc-overlay-cell");
+			return;
+		}
+
+		// Reading view: write value directly
+		cellEl.textContent = error || String(data);
+	}
+
+	private _setFormattedCellValue(cellEl: HTMLElement, value: any, error?: string): void {
 		let data = value;
 
 		// Handle mathjs Unit objects - check for the presence of unit-specific properties

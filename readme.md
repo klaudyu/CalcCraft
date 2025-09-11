@@ -13,11 +13,16 @@ The table is divided in columns (labeled from 'a' to 'z', and numerical rows)
 
 After expanding the expressions are evaluated using  [mathjs](https://mathjs.org/docs/reference/functions.html), therefore supporting many functions from there. Ranges between `[ ... ]` are expanded as matrices, and can be used for matrix operations.
 ### operations
-most of the functions from 
+most of the functions from [mathjs](https://mathjs.org/docs/reference/functions.html)
+
+### Real-time Formula Evaluation in Edit Mode
+- **Edit Mode**: Formulas remain visible while editing, with computed values shown as overlays
+- **Reading Mode**: Clean display with computed results only
+
 #### Spreadsheet like references
 If the result is a vector or a matrix the output will be expanded to multiple cells, and the references for those cells are recomputed.
 The references supported are in `[a-z][0-9]+` format (lowercase)
-Besides this `a1` reference style, the cells can be referenced using colum-row notation: `[0-9]c[0-9]r`, where `c` stands for column and `r` stands for row. So for addressing the `b3` cell we could also write `2c3r` (column 2, row 3).
+Besides this `a1` reference style, the cells can be referenced using colum-row notation: `[0-9]+c[0-9]r`, where `c` stands for column and `r` stands for row. So for addressing the `b3` cell we could also write `2c3r` (column 2, row 3).
 The column-row notation supports also relative referencing by adding a `+` or `-` before the number. 
 Combinations of the two are possible:
 - `=b+3r` cell at column `b` , 3 rows down.
@@ -30,6 +35,33 @@ summing all the values in the curent column from the second row to the cell abov
 The cells that influence the curent cell, are called `parents`, and the ones that depend on the curent cell are called `children`. Hovering the mouse over a cell, shows both the parents and the children, in customizable colors. This makes it easier to track the flow of data in the sheet. The colors can be customized for the dark theme and for the light theme.
 ### Highlighting errors
 If a cell while trying to be resolved loops back to itself, then a `loop` error is thrown and displayed. This is also valid for matrix operations, where a cell influences multiple cells.
+
+### Powered by MathJS with Units Support
+Formulas are evaluated using [mathjs](https://mathjs.org/docs/reference/functions.html)
+- **Native unit parsing**: `5 kg`,  `25 celsius`, `12 inch`
+- **Unit arithmetic**: `=5 kg + 3000 g` automatically converts and returns `8 kg`
+- **Unit conversion**: `=5 inch to cm` converts between unit systems
+- **Matrix operations with units**: Full support for unit calculations in ranges and matrices
+
+### Matrix and Range Operations
+Ranges between `[...]` are expanded as matrices and can be used for matrix operations:
+- **Standard ranges**: `a1:c3` flattens to a 1D array for functions like `sum()`
+- **Matrix ranges**: `[a1:c3]` preserves 2D structure for matrix operations
+
+If the result is a vector or matrix, the output expands to multiple cells, and references for those cells are automatically recomputed.
+
+### Visual Feedback and Error Handling
+- **Cell highlighting**: Hover over cells to see dependencies
+- **Parent cells**: Cells this formula depends on (customizable colors)
+- **Children cells**: Cells that depend on this cell (customizable colors)
+- **Error indication**: Loop detection with clear visual feedback
+- **Customizable themes**: Different color schemes for light and dark modes
+
+### Smart Processing Options
+- **Class filtering**: Only process tables in files with specific cssclass in frontmatter
+- **Edit-aware processing**: No interruption while actively typing or editing
+- **Live Preview support**: Real-time updates with proper event handling
+
 
 ## Examples
 
@@ -193,3 +225,66 @@ values that don't fit in the existing table are disgarded
 |                                     |     |     |     |                     |     |             |
 |                                     |     |     |     |                     |     |             |
 ```
+
+
+## Configuration and Setup
+
+### Class-based Processing
+Add to your note's frontmatter to enable processing:
+```yaml
+---
+cssclass: calccraft
+---
+```
+
+This allows selective processing - only notes with the specified cssclass will have their tables processed. Configure the required class name in plugin settings.
+
+### Plugin Settings
+- **Decimal precision**: Control number of decimal places (-1 for default)
+- **Show labels**: Display row numbers and column letters
+- **Formula cell styling**: Borders, colors, and highlighting options
+- **Parent/children highlighting**: Colors for dependency visualization
+- **Error cell styling**: Visual feedback for formula errors
+- **Theme support**: Separate color schemes for light and dark themes
+- **Class filtering**: Enable/disable selective processing by cssclass
+
+### Visual Customization
+- **Formula cells**: Highlighted with borders and background colors
+- **Matrix cells**: Special styling for cells filled by matrix operations
+- **Error cells**: Clear visual indication of calculation errors
+- **Hover effects**: Dynamic highlighting of cell dependencies
+- **Row/column labels**: Optional display of spreadsheet-style coordinates
+
+## Advanced Features
+
+### Edit Mode Support
+CalcCraft now provides full edit mode support:
+- Formulas remain visible while editing
+- Computed values appear as overlays
+
+### Live Preview Integration
+- Integration with Obsidian's Live Preview
+- Dynamic formula evaluation as you type
+- Proper event handling for smooth performance
+- Debounced updates to prevent excessive computation
+
+### Performance Optimizations
+- Smart caching to avoid unnecessary recalculations
+- Edit-aware processing that respects active editing sessions
+- Efficient dependency tracking for large tables
+- Optimized matrix operations for better performance
+
+### Error Recovery
+- Handling of malformed formulas
+- Visual indicators for problematic cells
+- Prevention of infinite loops in complex dependencies
+
+## Tips and Best Practices
+
+1. **Use relative references** for formulas you want to copy across rows/columns
+2. **Hover over cells** to understand dependencies and data flow
+3. **Use `[a1:c3]` for matrix operations**, `a1:c3` for simple ranges
+4. **Include units in your data** - the plugin handles conversions automatically
+5. **Check the browser console** (F12) for detailed debugging information
+6. **Use cssclass filtering** if you only need calccraft on specific pages
+7. **Test complex formulas incrementally** to identify issues early

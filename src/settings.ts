@@ -6,6 +6,8 @@ export const DefaultSettings = {
 	showLabels: true,
 	formula_background_color_toggle: true,
 	showBorders: true,
+	digitGrouping: false,
+	groupingSeparator: ",",
 	formula_background_error_toggle: true,
 	formula_background_parents_toggle: true,
 	formula_background_children_toggle: true,
@@ -65,6 +67,39 @@ export class CalcCraftSettingsTab extends PluginSettingTab {
 						this.reloadPages();
 					})
 			);
+
+		new Setting(containerEl)
+			.setName("Enable digit grouping")
+			.setDesc("Add thousands separators to large numbers (e.g., 1,234.56)")
+			.addToggle(toggle =>
+				toggle.setValue(this.plugin.settings.digitGrouping).onChange(async value => {
+					this.plugin.settings.digitGrouping = value;
+					await this.plugin.saveSettings();
+					this.display(); // Refresh to show/hide separator option
+					this.reloadPages();
+				})
+			);
+
+		// Only show separator input when grouping is enabled
+		if (this.plugin.settings.digitGrouping) {
+			new Setting(containerEl)
+				.setName("Grouping separator")
+				.setDesc("Character to use for digit grouping")
+				.addDropdown(dropdown => {
+					dropdown
+						.addOption(",", "Comma (1,234)")
+						.addOption(".", "Period (1.234)")
+						.addOption(" ", "Space (1 234)")
+						.addOption("'", "Apostrophe (1'234)")
+						.setValue(this.plugin.settings.groupingSeparator)
+						.onChange(async value => {
+							this.plugin.settings.groupingSeparator = value;
+							await this.plugin.saveSettings();
+							this.reloadPages();
+						});
+				});
+		}
+
 		new Setting(containerEl)
 			.setName("show labels")
 			.setDesc("show labels.")
