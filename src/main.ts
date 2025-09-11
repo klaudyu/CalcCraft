@@ -3,7 +3,7 @@ import { Plugin, MarkdownPostProcessorContext, App, MarkdownView, debounce, TFil
 import { CalcCraftSettingsTab, DefaultSettings } from "./settings";
 import { TableEvaluator } from "./table-evaluator";
 
-const debug = true;
+const debug = false;
 
 export default class CalcCraftPlugin extends Plugin {
 	settings: any = {};
@@ -16,40 +16,92 @@ export default class CalcCraftPlugin extends Plugin {
 
 	private lpCleanup: Array<() => void> = [];
 
+// Add this property to track previous cssclass values
+private cssClassCache = new Map<string, string[]>();
 
-	async onload() {
-		await this.loadSettings();
-		this.registerMarkdownPostProcessor(this.postProcessor.bind(this));
+async onload() {
+    await this.loadSettings();
+    this.registerMarkdownPostProcessor(this.postProcessor.bind(this));
 
-		// edit mode support:
-		this.settings_tab = new CalcCraftSettingsTab(this.app, this);
-		this.addSettingTab(this.settings_tab);
-		this.debug("table formula plugin loaded");
-		this.settings_tab.reloadPages();
+    // edit mode support:
+    this.settings_tab = new CalcCraftSettingsTab(this.app, this);
+    this.addSettingTab(this.settings_tab);
+    this.debug("table formula plugin loaded");
+    this.settings_tab.reloadPages();
 
-		// Add Live Preview support:
-		this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.attachLivePreviewHooks()));
-		this.registerEvent(this.app.workspace.on("layout-change", () => this.attachLivePreviewHooks()));
-		this.attachLivePreviewHooks();
+    // Add Live Preview support:
+    this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.attachLivePreviewHooks()));
+    this.registerEvent(this.app.workspace.on("layout-change", () => this.attachLivePreviewHooks()));
+    this.attachLivePreviewHooks();
 
-		this.registerEvent(
-			this.app.metadataCache.on("changed", (file) => {
-				// Only refresh if class filter is enabled
-				if (this.settings.enableClassFilter) {
-					this.refreshPageIfNeeded(file);
-				}
-			})
-		);
-	}
+    this.registerEvent(
+        this.app.metadataCache.on("changed", (file) => {
+            // Only refresh if class filter is enabled AND cssclass actually changed
+            if (this.settings.enableClassFilter) {
+                this.checkCssClassChange(file);
+            }
+        })
+    );
+}
 
-	async onunload(): Promise<void> {
-		this.detachLivePreviewHooks(); // add this
-		this.settings_tab.reloadPages();
+private extractCssClasses(frontmatter: any): string[] {
+    const classes: string[] = [];
+    
+    if (frontmatter?.cssclass) {
+        if (typeof frontmatter.cssclass === 'string') {
+            classes.push(...frontmatter.cssclass.split(/\s+/));
+        } else if (Array.isArray(frontmatter.cssclass)) {
+            classes.push(...frontmatter.cssclass);
+        }
+    }
+    
+    if (frontmatter?.cssclasses) {
+        if (typeof frontmatter.cssclasses === 'string') {
+            classes.push(...frontmatter.cssclasses.split(/\s+/));
+        } else if (Array.isArray(frontmatter.cssclasses)) {
+            classes.push(...frontmatter.cssclasses);
+        }
+    }
+    
+    return classes.filter(cls => cls.trim().length > 0);
+}
 
-		// Clear any remaining references
-		this.htmlTable = [];
-		this.lpCleanup = [];
-	}
+private checkCssClassChange(file: TFile) {
+    const cache = this.app.metadataCache.getFileCache(file);
+    const newClasses = cache?.frontmatter ? this.extractCssClasses(cache.frontmatter) : [];
+    const oldClasses = this.cssClassCache.get(file.path) || [];
+    
+    // Sort both arrays for comparison
+    const newSorted = [...newClasses].sort();
+    const oldSorted = [...oldClasses].sort();
+    
+    // Check if cssclasses actually changed
+    const hasChanged = newSorted.length !== oldSorted.length || 
+                      !newSorted.every((cls, i) => cls === oldSorted[i]);
+    
+    if (hasChanged) {
+        this.debug(`CSS classes changed for ${file.name}: [${oldClasses.join(', ')}] -> [${newClasses.join(', ')}]`);
+        
+        // Update cache
+        this.cssClassCache.set(file.path, newClasses);
+        
+        // Only refresh if this is the active file
+        const activeFile = this.app.workspace.getActiveFile();
+        if (activeFile && activeFile.path === file.path) {
+            this.refreshPageIfNeeded(file);
+        }
+    } else {
+        this.debug(`CSS classes unchanged for ${file.name}, skipping refresh`);
+    }
+}
+
+private refreshPageIfNeeded(file: TFile) {
+    this.debug("CSS classes changed, refreshing page");
+    setTimeout(() => {
+        this.app.workspace.getLeavesOfType("markdown").forEach((e: any) => e.rebuildView());
+    }, 100); // Small delay to ensure frontmatter is fully processed
+}
+
 
 	async postProcessor(el: HTMLElement, ctx: MarkdownPostProcessorContext) {
     // Check if class filter is enabled
@@ -518,20 +570,6 @@ export default class CalcCraftPlugin extends Plugin {
 		// Initial pass
 		this.recomputeLivePreview();
 	};
-
-	private refreshPageIfNeeded(file: TFile) {
-    // Check if this is the currently active file
-    const activeFile = this.app.workspace.getActiveFile();
-    if (!activeFile || activeFile.path !== file.path) {
-        return;
-    }
-
-    setTimeout(() => {
-        this.debug("Frontmatter changed, refreshing all markdown views");
-        // Same as settings tab does
-        this.app.workspace.getLeavesOfType("markdown").forEach((e: any) => e.rebuildView());
-    }, 100);
-}
 
 
 	private detachLivePreviewHooks = () => {
