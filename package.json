@@ -1,11 +1,11 @@
 {
 	"name": "CalcCraft-plugin",
-	"version": "2.0.0",
+	"version": "2.0.1",
 	"description": "this is an excel like plugin Obsidian (https://obsidian.md)",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
-	    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/copy-static-files.js",
+		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/copy-static-files.js",
 		"version": "node version-bump.mjs && git add manifest.json versions.json"
 	},
 	"keywords": [],
