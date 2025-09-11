@@ -432,7 +432,8 @@ export default class CalcCraftPlugin extends Plugin {
 
 		// Reuse your existing processor here:
 		this.postProcessor(root, {} as any);
-	} //, 300, true);
+	}  
+	//} , 300, true);
 
 	private attachLivePreviewHooks = () => {
 		this.detachLivePreviewHooks();

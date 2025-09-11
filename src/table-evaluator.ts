@@ -54,13 +54,13 @@ export class TableEvaluator {
 
         // Initialize arrays
         this.initializeArrays(gridData);
-        
+
         // Parse grid
         this.parseGridData(gridData);
-        
+
         // Compute all cells
         this.computeAllCells();
-        
+
         return {
             values: this.tableData,
             errors: this.errors,
@@ -95,7 +95,7 @@ export class TableEvaluator {
         for (let rowIndex = 0; rowIndex < this.maxrows; rowIndex++) {
             for (let colIndex = 0; colIndex < this.maxcols; colIndex++) {
                 const cellContent = gridData[rowIndex]?.[colIndex] || "";
-                
+
                 this.tableData[rowIndex][colIndex] = cellContent === "" ? null : cellContent;
 
                 if (cellContent.startsWith("=")) {
@@ -193,10 +193,27 @@ export class TableEvaluator {
             this.debug(`getValueByCoordinates giving the value ${this.tableData[row][col]}`);
             const val = this.tableData[row][col];
             if (val === null) return 0;
-            if (typeof val === "number" || (!isNaN(parseFloat(val)) && isFinite(val))) {
-                return val;
+
+            //if (typeof val === "number" || (!isNaN(parseFloat(val)) && isFinite(val))) { return val; }
+
+            if (typeof val === "number") return val;
+
+            if (typeof val === "string") {
+                const numVal = parseFloat(val);
+                if (!isNaN(numVal) && isFinite(numVal) && val.trim() === numVal.toString()) {
+                    return numVal; // Pure number
+                }
+
+                // For unit strings, return the original string for mathjs
+                const unitMatch = val.match(/^(-?\d*\.?\d+)\s*[a-zA-Z]+/);
+                if (unitMatch) {
+                    return val; // Return "3 kg" as-is
+                }
+
+                return 0; // Non-numeric text
             }
-            if (typeof val === "string") return `"${val}"`;
+
+
             if (this.useBool) return val;
             return this.bool2nr(val);
         } else {
@@ -210,7 +227,7 @@ export class TableEvaluator {
             this.cellstatus[row][col] = cellstatus.computing;
             const formula = this.formulaData[row][col].slice(1);
             if (debug) {
-                this.debug(`we are asked to fill in at ${this.cords2ref(row,col)} with formula: ${formula}`);
+                this.debug(`we are asked to fill in at ${this.cords2ref(row, col)} with formula: ${formula}`);
             }
 
             const sanitizedFormula = this.sanitizeFormula(formula);
@@ -337,245 +354,297 @@ export class TableEvaluator {
         return parsed[0][0];
     }
 
-	cleanupchildren([row, col]: [number, number], [rootRow, rootCol]: [number, number], i = 0): void {
-		//set the parents for [row,col] and its parents computed to none
-		//the whole process was initiated by the matrix formula at rootRow,rootCol
-		//so if, one of the children or children of chilren,...
-		//wants to cleanup the rootcell, it means there is a loop
-		if (i++ > 10) {
-			throw new Error(`too high recursivity on cleanupchildren`);
-		}
-		//we already cleand it up
-		this.children[row][col].forEach(([r, c]) => {
-			this.debug(`cleanup? status for ${this.cords2ref(r, c)} is ${this.cellstatus[r][c]} `);
-			if (this.cellstatus[r][c] === cellstatus.iscomputed) {
-				if (r === rootRow && c === rootCol) {
-					//we are trying to clean up the matrix cell
-					//which would force it to recompute
-					throw new InfiniteLoop(`matrix<br>loop ${this.cords2ref(row, col)}`);
-				}
-				this.debug("yes, cleanup");
-				this.cellstatus[r][c] = cellstatus.none;
-				this.cleanupchildren([r, c], [rootRow, rootCol], i);
-			} else {
-				this.debug("nope");
-			}
-		});
-	}
-	computechildren(row: number, col: number, i = 0): void {
-		this.debug(
-			`recomputing the children of ${this.cords2ref(row, col)}: ${this.children[row][col]
-				.map(([r, c]) => this.cords2ref(r, c))
-				.join(", ")}`
-		);
+    cleanupchildren([row, col]: [number, number], [rootRow, rootCol]: [number, number], i = 0): void {
+        //set the parents for [row,col] and its parents computed to none
+        //the whole process was initiated by the matrix formula at rootRow,rootCol
+        //so if, one of the children or children of chilren,...
+        //wants to cleanup the rootcell, it means there is a loop
+        if (i++ > 10) {
+            throw new Error(`too high recursivity on cleanupchildren`);
+        }
+        //we already cleand it up
+        this.children[row][col].forEach(([r, c]) => {
+            this.debug(`cleanup? status for ${this.cords2ref(r, c)} is ${this.cellstatus[r][c]} `);
+            if (this.cellstatus[r][c] === cellstatus.iscomputed) {
+                if (r === rootRow && c === rootCol) {
+                    //we are trying to clean up the matrix cell
+                    //which would force it to recompute
+                    throw new InfiniteLoop(`matrix<br>loop ${this.cords2ref(row, col)}`);
+                }
+                this.debug("yes, cleanup");
+                this.cellstatus[r][c] = cellstatus.none;
+                this.cleanupchildren([r, c], [rootRow, rootCol], i);
+            } else {
+                this.debug("nope");
+            }
+        });
+    }
+    computechildren(row: number, col: number, i = 0): void {
+        this.debug(
+            `recomputing the children of ${this.cords2ref(row, col)}: ${this.children[row][col]
+                .map(([r, c]) => this.cords2ref(r, c))
+                .join(", ")}`
+        );
 
-		if (i++ > 100) {
-			throw new Error(`too high recursivity on computechildren`);
-		}
-		this.children[row][col].forEach(([r, c]) => {
-			if (this.cellstatus[r][c] !== cellstatus.iscomputed) {
-				const res = this.getValueByCoordinates(r, c);
-				this.debug(`value for ${this.cords2ref(r, c)} is ${res} `);
-				this.debug(`status for ${this.cords2ref(r, c)} is ${this.cellstatus[r][c]} `);
-				this.computechildren(r, c);
-			}
-		});
-	}
+        if (i++ > 100) {
+            throw new Error(`too high recursivity on computechildren`);
+        }
+        this.children[row][col].forEach(([r, c]) => {
+            if (this.cellstatus[r][c] !== cellstatus.iscomputed) {
+                const res = this.getValueByCoordinates(r, c);
+                this.debug(`value for ${this.cords2ref(r, c)} is ${res} `);
+                this.debug(`status for ${this.cords2ref(r, c)} is ${this.cellstatus[r][c]} `);
+                this.computechildren(r, c);
+            }
+        });
+    }
 
 
-	getValuebyReference(ref: string, formulaRow = 0, formulaCol = 0): string | number {
-		const coords = this.ref2cords(ref, formulaRow, formulaCol);
-		if (!coords) throw new Error("invalid cell reference");
-		const [row, col] = coords;
-		if (row < 0 || row > this.maxrows - 1 || col < 0 || col > this.maxcols - 1) {
-			throw new Error("cell<br>out of<br>table");
-		}
-		this.parents[formulaRow][formulaCol].push([row, col]);
+    getValuebyReference(ref: string, formulaRow = 0, formulaCol = 0): string | number {
+        const coords = this.ref2cords(ref, formulaRow, formulaCol);
+        if (!coords) throw new Error("invalid cell reference");
+        const [row, col] = coords;
+        if (row < 0 || row > this.maxrows - 1 || col < 0 || col > this.maxcols - 1) {
+            throw new Error("cell<br>out of<br>table");
+        }
+        this.parents[formulaRow][formulaCol].push([row, col]);
 
-		//this.debug(`{cords2ref[row,col]} is a parent of {cords2ref(formulaRow,formulaCol)}`);
-		this.children[row][col].push([formulaRow, formulaCol]);
-		return this.getValueByCoordinates(row, col);
-	}
+        //this.debug(`{cords2ref[row,col]} is a parent of {cords2ref(formulaRow,formulaCol)}`);
+        this.children[row][col].push([formulaRow, formulaCol]);
+        return this.getValueByCoordinates(row, col);
+    }
 
-	findclosingbracket(formula: string): string {
-		let counter = 1;
-		let pos = 0;
+    findclosingbracket(formula: string): string {
+        let counter = 1;
+        let pos = 0;
 
-		while (counter > 0 && pos < formula.length) {
-			if (formula[pos] === "(") counter++;
-			else if (formula[pos] === ")") counter--;
+        while (counter > 0 && pos < formula.length) {
+            if (formula[pos] === "(") counter++;
+            else if (formula[pos] === ")") counter--;
 
-			pos++;
-		}
-		const contentInsideParenthesis = formula.substring(0, pos - 1);
-		return contentInsideParenthesis;
-	}
+            pos++;
+        }
+        const contentInsideParenthesis = formula.substring(0, pos - 1);
+        return contentInsideParenthesis;
+    }
 
-	parsefunction(formula: string, pos: [number, number] = [0, 0]): string {
-		//these are the position of the calling cell; useful for relative coordinates
-		//also for puting asside the reference list for higlighting
-		const [formulaRow, formulaCol] = pos;
+    parsefunction(formula: string, pos: [number, number] = [0, 0]): string {
+        //these are the position of the calling cell; useful for relative coordinates
+        //also for puting asside the reference list for higlighting
+        const [formulaRow, formulaCol] = pos;
 
-		this.debug(`we parsefunction; ${this.cords2ref(formulaRow,formulaCol)} (location:${formulaRow},${formulaCol})`);
-		let i = 0;
-		let results = "";
+        this.debug(`we parsefunction; ${this.cords2ref(formulaRow, formulaCol)} (location:${formulaRow},${formulaCol})`);
+        let i = 0;
+        let results = "";
 
-		while (i < formula.length) {
-			if (formula[i] === "(") {
-				//look inside paranthesis, end expand them, recursively
-				const contentInsideParenthesis = this.findclosingbracket(formula.slice(i + 1));
-				//we call here the same function with the parantheses contents
-				const res = this.parsefunction(contentInsideParenthesis, [formulaRow, formulaCol]);
-				results += "(" + res + ")";
-				i += contentInsideParenthesis.length + 2;
-				this.debug(`${contentInsideParenthesis}`);
-				this.debug(`the rest is ${formula.slice(i)}`);
-			} else {
-				const restformula = formula.slice(i);
-				this.debug(`rest formula is:${restformula}`);
-				const matchCell = restformula.match(/^([a-z]|[+-]?\d+c)([+-]?\d+r|\d+)/);
+        while (i < formula.length) {
+            if (formula[i] === "(") {
+                //look inside paranthesis, end expand them, recursively
+                const contentInsideParenthesis = this.findclosingbracket(formula.slice(i + 1));
+                //we call here the same function with the parantheses contents
+                const res = this.parsefunction(contentInsideParenthesis, [formulaRow, formulaCol]);
+                results += "(" + res + ")";
+                i += contentInsideParenthesis.length + 2;
+                this.debug(`${contentInsideParenthesis}`);
+                this.debug(`the rest is ${formula.slice(i)}`);
+            } else {
+                const restformula = formula.slice(i);
+                this.debug(`rest formula is:${restformula}`);
+                const matchCell = restformula.match(/^([a-z]|[+-]?\d+c)([+-]?\d+r|\d+)/);
 
-				//const matchOp = restformula.match(/^[+\-*/]/);
+                //const matchOp = restformula.match(/^[+\-*/]/);
 
-				const matchRange = restformula.match(
-					/^([a-z]|[+-]?\d+c)([+-]?\d+r|\d+):([a-z]|[+-]?\d+c)([+-]?\d+r|\d+)/
-				);
+                const matchRange = restformula.match(
+                    /^([a-z]|[+-]?\d+c)([+-]?\d+r|\d+):([a-z]|[+-]?\d+c)([+-]?\d+r|\d+)/
+                );
 
-				const matchMatrix = restformula.match(
-					//basically matchRange but between `[` `]`
-					/^\[([a-z]|[+-]\d+c)([+-]\d+r|\d+):([a-z]|[+-]\d+c)([+-]\d+r|\d+)\]/
-				);
+                const matchMatrix = restformula.match(
+                    //basically matchRange but between `[` `]`
+                    /^\[([a-z]|[+-]\d+c)([+-]\d+r|\d+):([a-z]|[+-]\d+c)([+-]\d+r|\d+)\]/
+                );
 
-				const matchformula = restformula.match(/^[a-zA-Z]{3,}\(/);
+                const matchformula = restformula.match(/^[a-zA-Z]{3,}\(/);
 
-				const matchNum = restformula.match(/^\d+/);
+                const matchNum = restformula.match(/^\d+/);
 
-				//const matchRange=restformula.match(/^[a-z]\d+:[a-z]\d+/); //normal range
-				//const matchRange = restformula.match(/^[a-z](?:\+|-)?\d+:[a-z](?:\+|-)?\d+/);
+                //const matchRange=restformula.match(/^[a-z]\d+:[a-z]\d+/); //normal range
+                //const matchRange = restformula.match(/^[a-z](?:\+|-)?\d+:[a-z](?:\+|-)?\d+/);
 
-				const matchRangeCol = restformula.match(/^[a-z]:[a-z]/); //column range
-				const matchRangeColMatrix = restformula.match(/^\[[a-z]:[a-z]\]/); //column range
-				const matchRangeRow = restformula.match(/^\d+:\d+/); //row range
+                const matchRangeCol = restformula.match(/^[a-z]:[a-z]/); //column range
+                const matchRangeColMatrix = restformula.match(/^\[[a-z]:[a-z]\]/); //column range
+                const matchRangeRow = restformula.match(/^\d+:\d+/); //row range
 
-				if (matchRange) {
-					/* normal range a3:b7 or a-3:b+7, or anything in between;
+                if (matchRange) {
+                    /* normal range a3:b7 or a-3:b+7, or anything in between;
                         the rows and columns are mentioned, either absolute or relative */
-					this.debug(`we matched a range`);
-					i += matchRange[0].length - 1;
-					const [start, end] = matchRange[0].split(":"); // Split the range into start and end
-					const startCoords = this.ref2cords(start, formulaRow, formulaCol);
-					const endCoords = this.ref2cords(end, formulaRow, formulaCol);
-					if (!startCoords || !endCoords) throw new Error("invalid range reference");
-					const [startRow, startCol] = startCoords;
-					const [endRow, endCol] = endCoords;
-					this.debug(`we look for range till ${this.cords2ref(endRow, endCol)}`);
-					results += this.unfoldRange(startRow, endRow, startCol, endCol, pos, false);
-				} else if (matchMatrix) {
-					this.debug(`we matched a matrix`);
-					i += matchMatrix[0].length - 1;
-					const [start, end] = matchMatrix[0].slice(1, -1).split(":"); // Split the range into start and end
-					const startCoords = this.ref2cords(start, formulaRow, formulaCol);
-					const endCoords = this.ref2cords(end, formulaRow, formulaCol);
-					if (!startCoords || !endCoords) throw new Error("invalid range reference");
-					const [startRow, startCol] = startCoords;
-					const [endRow, endCol] = endCoords;
-					this.debug(`we look for range till ${this.cords2ref(endRow, endCol)}`);
-					results += this.unfoldRange(startRow, endRow, startCol, endCol, pos, true);
-				} else if (matchRangeCol) {
-					this.debug(`we matched a column range`);
-					i += matchRangeCol[0].length - 1;
-					const [start, end] = matchRangeCol[0].split(":"); // Split the range into start and end
-					const [startCol, startRow] = [this.letter2col(start), 1];
-					const [endCol, endRow] = [this.letter2col(end), this.maxrows - 1];
-					results += this.unfoldRange(startRow, endRow, startCol, endCol, pos);
-				} else if (matchRangeColMatrix) {
-					this.debug(`we matched a column range Matrix`);
-					i += matchRangeColMatrix[0].length - 1;
-					const [start, end] = matchRangeColMatrix[0].slice(1, -1).split(":"); // Split the range into start and end
-					const [startCol, startRow] = [this.letter2col(start), 1];
-					const [endCol, endRow] = [this.letter2col(end), this.maxrows - 1];
-					results += this.unfoldRange(startRow, endRow, startCol, endCol, pos, true);
-				} else if (matchRangeRow) {
-					this.debug(`we matched a row range`);
-					i += matchRangeRow[0].length - 1;
-					const [start, end] = matchRangeRow[0].split(":"); // Split the range into start and end
-					const startCol = 0;
-					const endCol = this.maxcols - 1;
-					const startRow = this.number2row(parseInt(start));
-					const endRow = this.number2row(parseInt(end));
-					results += this.unfoldRange(startRow, endRow, startCol, endCol, pos);
-				} else if (matchformula) {
-					this.debug(`we matched formula ${matchformula}`);
-					const contentInsideParenthesis = this.findclosingbracket(
-						restformula.slice(matchformula[0].length)
-					);
-					this.debug(`contentInsideParenthesis ${contentInsideParenthesis}`);
-					const res = this.parsefunction(contentInsideParenthesis, [
-						formulaRow,
-						formulaCol //this keeps the referencing cell; for highlighting
-					]);
-					results += matchformula[0] + res + ")";
-					i += matchformula[0].length + contentInsideParenthesis.length;
-				} else if (matchCell) {
-					this.debug(`we matched a cell`);
-					const ref = this.getValuebyReference(matchCell[0], formulaRow, formulaCol);
-					results += ref.toString();
-					i += matchCell[0].length - 1;
-				} else if (matchNum) {
-					this.debug(`we matched a number`);
-					results += matchNum[0];
-					i += matchNum[0].length - 1;
-				} /*else if (matchOp) {
+                    this.debug(`we matched a range`);
+                    i += matchRange[0].length - 1;
+                    const [start, end] = matchRange[0].split(":"); // Split the range into start and end
+                    const startCoords = this.ref2cords(start, formulaRow, formulaCol);
+                    const endCoords = this.ref2cords(end, formulaRow, formulaCol);
+                    if (!startCoords || !endCoords) throw new Error("invalid range reference");
+                    const [startRow, startCol] = startCoords;
+                    const [endRow, endCol] = endCoords;
+                    this.debug(`we look for range till ${this.cords2ref(endRow, endCol)}`);
+                    results += this.unfoldRange(startRow, endRow, startCol, endCol, pos, false);
+                } else if (matchMatrix) {
+                    this.debug(`we matched a matrix`);
+                    i += matchMatrix[0].length - 1;
+                    const [start, end] = matchMatrix[0].slice(1, -1).split(":"); // Split the range into start and end
+                    const startCoords = this.ref2cords(start, formulaRow, formulaCol);
+                    const endCoords = this.ref2cords(end, formulaRow, formulaCol);
+                    if (!startCoords || !endCoords) throw new Error("invalid range reference");
+                    const [startRow, startCol] = startCoords;
+                    const [endRow, endCol] = endCoords;
+                    this.debug(`we look for range till ${this.cords2ref(endRow, endCol)}`);
+                    results += this.unfoldRange(startRow, endRow, startCol, endCol, pos, true);
+                } else if (matchRangeCol) {
+                    this.debug(`we matched a column range`);
+                    i += matchRangeCol[0].length - 1;
+                    const [start, end] = matchRangeCol[0].split(":"); // Split the range into start and end
+                    const [startCol, startRow] = [this.letter2col(start), 1];
+                    const [endCol, endRow] = [this.letter2col(end), this.maxrows - 1];
+                    results += this.unfoldRange(startRow, endRow, startCol, endCol, pos);
+                } else if (matchRangeColMatrix) {
+                    this.debug(`we matched a column range Matrix`);
+                    i += matchRangeColMatrix[0].length - 1;
+                    const [start, end] = matchRangeColMatrix[0].slice(1, -1).split(":"); // Split the range into start and end
+                    const [startCol, startRow] = [this.letter2col(start), 1];
+                    const [endCol, endRow] = [this.letter2col(end), this.maxrows - 1];
+                    results += this.unfoldRange(startRow, endRow, startCol, endCol, pos, true);
+                } else if (matchRangeRow) {
+                    this.debug(`we matched a row range`);
+                    i += matchRangeRow[0].length - 1;
+                    const [start, end] = matchRangeRow[0].split(":"); // Split the range into start and end
+                    const startCol = 0;
+                    const endCol = this.maxcols - 1;
+                    const startRow = this.number2row(parseInt(start));
+                    const endRow = this.number2row(parseInt(end));
+                    results += this.unfoldRange(startRow, endRow, startCol, endCol, pos);
+                } else if (matchformula) {
+                    this.debug(`we matched formula ${matchformula}`);
+                    const contentInsideParenthesis = this.findclosingbracket(
+                        restformula.slice(matchformula[0].length)
+                    );
+                    this.debug(`contentInsideParenthesis ${contentInsideParenthesis}`);
+                    const res = this.parsefunction(contentInsideParenthesis, [
+                        formulaRow,
+                        formulaCol //this keeps the referencing cell; for highlighting
+                    ]);
+                    results += matchformula[0] + res + ")";
+                    i += matchformula[0].length + contentInsideParenthesis.length;
+                } else if (matchCell) {
+                    this.debug(`we matched a cell`);
+                    const ref = this.getValuebyReference(matchCell[0], formulaRow, formulaCol);
+                    results += ref.toString();
+                    i += matchCell[0].length - 1;
+                } else if (matchNum) {
+                    this.debug(`we matched a number`);
+                    results += matchNum[0];
+                    i += matchNum[0].length - 1;
+                } /*else if (matchOp) {
 					this.debug(`we matched a operation`);
 					results += matchOp[0];
 					i += matchOp[0].length - 1;
 				}*/ else {
-					results += restformula[0];
-					this.debug(`we didn't match anything`);
-				}
+                    results += restformula[0];
+                    this.debug(`we didn't match anything`);
+                }
 
-				i++;
-			}
-		}
-		this.debug(`results are:${results}`);
+                i++;
+            }
+        }
+        this.debug(`results are:${results}`);
 
-		return results;
-	}
+        return results;
+    }
 
-	unfoldRange(startRow: number, endRow: number, startCol: number, endCol: number, formulaPos: [number, number] = [0, 0], matrix = false): string {
-		//unfold ranges; if matrix is set, return as array of arrays, otherwise, just as an array
-		const [formulaRow, formulaCol] = formulaPos; //for higlighting
-		[startRow, endRow] = startRow > endRow ? [endRow, startRow] : [startRow, endRow];
-		[startCol, endCol] = startCol > endCol ? [endCol, startCol] : [startCol, endCol];
+    unfoldRange(startRow: number, endRow: number, startCol: number, endCol: number, formulaPos: [number, number] = [0, 0], matrix = false): string {
+        const [formulaRow, formulaCol] = formulaPos;
+        [startRow, endRow] = startRow > endRow ? [endRow, startRow] : [startRow, endRow];
+        [startCol, endCol] = startCol > endCol ? [endCol, startCol] : [startCol, endCol];
 
-		this.debug(`maxcols:${this.maxcols}; maxrows:${this.maxrows}`);
-		this.debug(`unfoldRange searching from ${startRow},${startCol} to ${endRow},${endCol}`);
-		endRow = Math.min(endRow, this.maxrows - 1);
-		endCol = Math.min(endCol, this.maxcols - 1);
-		const rowArray = []; // Array to store each row as a string
-		for (let r = startRow; r <= endRow; r++) {
-			const colArray = []; // Array to store the values in a single row
-			for (let c = startCol; c <= endCol; c++) {
-				this.parents[formulaRow][formulaCol].push([r, c]); //for highlighting
-				this.debug(
-					`we added ${this.cords2ref(r, c)} as child for ${this.cords2ref(
-						formulaRow,
-						formulaCol
-					)}`
-				);
-				this.children[r][c].push([formulaRow, formulaCol]);
-				const val = this.getValueByCoordinates(r, c); // Getting the value from the coordinates
-				colArray.push(val);
-			}
-			const rowtxt = colArray.join(",");
-			rowArray.push(matrix ? "[" + rowtxt + "]" : rowtxt);
-		}
-		const out = rowArray.join(",");
-		const rangetxt = matrix ? "[" + out + "]" : out;
-		this.debug("***we found a range***");
-		this.debug(`range text ${rangetxt}`);
-		return rangetxt;
-	}
+        endRow = Math.min(endRow, this.maxrows - 1);
+        endCol = Math.min(endCol, this.maxcols - 1);
+
+        // Track units in this range
+        let detectedUnit = null;
+        const values = [];
+
+        for (let r = startRow; r <= endRow; r++) {
+            for (let c = startCol; c <= endCol; c++) {
+                this.parents[formulaRow][formulaCol].push([r, c]);
+                this.children[r][c].push([formulaRow, formulaCol]);
+
+                const val = this.getValueByCoordinates(r, c);
+                const originalVal = this.tableData[r][c];
+
+                // Check if this cell has a unit
+                if (typeof originalVal === "string" && originalVal) {
+                    const unitMatch = originalVal.match(/^(-?\d*\.?\d+)\s*([a-zA-Z]+)/);
+                    if (unitMatch && !detectedUnit) {
+                        detectedUnit = unitMatch[2]; // Store the unit (kg, etc.)
+                    }
+                }
+
+                values.push(val);
+            }
+        }
+
+        // If we found a unit, convert zeros to that unit
+        if (detectedUnit) {
+            const processedValues = values.map(val => {
+                if (val === 0) {
+                    return `0 ${detectedUnit}`;
+                } else if (typeof val === "number") {
+                    return `${val} ${detectedUnit}`;
+                }
+                return val;
+            });
+
+            const out = processedValues.join(",");
+            return matrix ? "[" + out + "]" : out;
+        }
+
+        // No units detected, return as normal
+        const out = values.join(",");
+        return matrix ? "[" + out + "]" : out;
+    }
+
+    _unfoldRange(startRow: number, endRow: number, startCol: number, endCol: number, formulaPos: [number, number] = [0, 0], matrix = false): string {
+        //unfold ranges; if matrix is set, return as array of arrays, otherwise, just as an array
+        const [formulaRow, formulaCol] = formulaPos; //for higlighting
+        [startRow, endRow] = startRow > endRow ? [endRow, startRow] : [startRow, endRow];
+        [startCol, endCol] = startCol > endCol ? [endCol, startCol] : [startCol, endCol];
+
+        this.debug(`maxcols:${this.maxcols}; maxrows:${this.maxrows}`);
+        this.debug(`unfoldRange searching from ${startRow},${startCol} to ${endRow},${endCol}`);
+        endRow = Math.min(endRow, this.maxrows - 1);
+        endCol = Math.min(endCol, this.maxcols - 1);
+        const rowArray = []; // Array to store each row as a string
+        for (let r = startRow; r <= endRow; r++) {
+            const colArray = []; // Array to store the values in a single row
+            for (let c = startCol; c <= endCol; c++) {
+                this.parents[formulaRow][formulaCol].push([r, c]); //for highlighting
+                this.debug(
+                    `we added ${this.cords2ref(r, c)} as child for ${this.cords2ref(
+                        formulaRow,
+                        formulaCol
+                    )}`
+                );
+                this.children[r][c].push([formulaRow, formulaCol]);
+                const val = this.getValueByCoordinates(r, c); // Getting the value from the coordinates
+                colArray.push(val);
+            }
+            const rowtxt = colArray.join(",");
+            rowArray.push(matrix ? "[" + rowtxt + "]" : rowtxt);
+        }
+        const out = rowArray.join(",");
+        const rangetxt = matrix ? "[" + out + "]" : out;
+        this.debug("***we found a range***");
+        this.debug(`range text ${rangetxt}`);
+        return rangetxt;
+    }
 
     private sanitizeFormula(formula: string): string {
         // Remove potentially dangerous patterns
