@@ -233,105 +233,122 @@ export class TableEvaluator {
     }
 
     getValueByCoordinates(row: number, col: number) {
-    const r = this.cords2ref(row, col);
-    this.debug(`getValueByCoordinates ${r}`);
+        const r = this.cords2ref(row, col);
+        this.debug(`getValueByCoordinates ${r}`);
 
-    if (this.cellstatus[row][col] == cellstatus.iscomputed) {
-        this.debug(`getValueByCoordinates giving the value ${this.tableData[row][col]}`);
-        const val = this.tableData[row][col];
-        
-        if (val === null) return 0;
-        
-        // Handle unit values
-        if (typeof val === "string") {
-            const parsed = this.parseUnitValue(val);
-            if (parsed.unit) {
-                // Return as mathjs unit format: "value unit"
-                return `${parsed.value} ${parsed.unit}`;
-            }
-            // Check if it's a number string
-            if (!isNaN(parseFloat(val)) && isFinite(parseFloat(val))) {
-                return parseFloat(val);
-            }
-            // Return as quoted string for mathjs
-            return `"${val}"`;
-        }
-        
-        if (typeof val === "number" || (!isNaN(parseFloat(val)) && isFinite(val))) {
-            return val;
-        }
-        
-        if (this.useBool) return val;
-        return this.bool2nr(val);
-    } else {
-        if (this.cellstatus[row][col] == cellstatus.computing) {
-            this.debug("********infinite loop*************");
-            const ref = this.cords2ref(row, col);
-            this.debug(`${ref}`);
-            throw new InfiniteLoop(`${ref}`);
-        }
+        if (this.cellstatus[row][col] == cellstatus.iscomputed) {
+            this.debug(`getValueByCoordinates giving the value ${this.tableData[row][col]}`);
+            const val = this.tableData[row][col];
 
-        this.cellstatus[row][col] = cellstatus.computing;
-        const formula = this.formulaData[row][col].slice(1);
-        
-        if (debug) {
-            this.debug(`we are asked to fill in at ${row},${col} with formula: ${formula}`);
-        }
-        
-        let processedformula;
-        try {
-            processedformula = this.parsefunction(formula, [row, col]);
-        } catch (error) {
-            if (error instanceof InfiniteLoop) {
+            if (val === null) return 0;
+
+            // Handle unit values
+            if (typeof val === "string") {
+                const parsed = this.parseUnitValue(val);
+                if (parsed.unit) {
+                    // Return as mathjs unit format: "value unit"
+                    return `${parsed.value} ${parsed.unit}`;
+                }
+                // Check if it's a number string
+                if (!isNaN(parseFloat(val)) && isFinite(parseFloat(val))) {
+                    return parseFloat(val);
+                }
+                // Return as quoted string for mathjs
+                return `"${val}"`;
+            }
+
+            if (typeof val === "number" || (!isNaN(parseFloat(val)) && isFinite(val))) {
+                return val;
+            }
+
+            if (this.useBool) return val;
+            return this.bool2nr(val);
+        } else {
+            if (this.cellstatus[row][col] == cellstatus.computing) {
+                this.debug("********infinite loop*************");
                 const ref = this.cords2ref(row, col);
-                this.errors[row][col] = "loop<br>" + error.message;
+                this.debug(`${ref}`);
                 throw new InfiniteLoop(`${ref}`);
             }
-            this.errors[row][col] = error.message;
-            throw error;
-        }
 
-        try {
-            this.debug(`we will evaluate the formula: ${processedformula}`);
-            const result = evaluate(processedformula);
-            this.debug(
-                `we were asked to fill in at ${this.cords2ref(
-                    row,
-                    col
-                )} with formula: ${formula} ; the result is ${result}`
-            );
+            this.cellstatus[row][col] = cellstatus.computing;
+            const formula = this.formulaData[row][col].slice(1);
 
-            // Enhanced unit handling
-            if (result && typeof result === "object" && result.constructor?.name === "Unit") {
-                // mathjs Unit object - store as is
-                this.cellstatus[row][col] = cellstatus.iscomputed;
-                this.tableData[row][col] = result;
-                return result;
-            } else {
-                // Try to parse as JSON for arrays/matrices
-                try {
-                    const parsed = JSON.parse(result);
-                    if (Array.isArray(parsed)) {
-                        return this.fillInMatrix(row, col, parsed);
-                    }
-                } catch {
-                    // Not JSON, continue with regular handling
-                }
+            if (debug) {
+                this.debug(`we are asked to fill in at ${row},${col} with formula: ${formula}`);
             }
 
-            this.cellstatus[row][col] = cellstatus.iscomputed;
-            this.tableData[row][col] = result;
-            return result;
-        } catch (error) {
-            this.errors[row][col] = error.message;
-            this.cellstatus[row][col] = cellstatus.iscomputed;
-            this.tableData[row][col] = null;
-            const r = this.cords2ref(row, col);
-            this.debug(`error computing cell ${r}`);
-            return null;
+            let processedformula;
+            try {
+                processedformula = this.parsefunction(formula, [row, col]);
+            } catch (error) {
+                if (error instanceof InfiniteLoop) {
+                    const ref = this.cords2ref(row, col);
+                    this.errors[row][col] = "loop<br>" + error.message;
+                    throw new InfiniteLoop(`${ref}`);
+                }
+                this.errors[row][col] = error.message;
+                throw error;
+            }
+
+            // In getValueByCoordinates method, replace the result handling section:
+
+try {
+    this.debug(`we will evaluate the formula: ${processedformula}`);
+    const result = evaluate(processedformula);
+    this.debug(
+        `we were asked to fill in at ${this.cords2ref(
+            row,
+            col
+        )} with formula: ${formula} ; the result is ${result}`
+    );
+
+    // Handle mathjs Matrix objects (like DenseMatrix2)
+    if (result && typeof result === "object" && result.constructor?.name?.includes("Matrix")) {
+        // Convert mathjs Matrix to plain array using toArray()
+        const matrixArray = result.toArray();
+        return this.fillInMatrix(row, col, matrixArray);
+    }
+    
+    // Handle mathjs Unit objects
+    if (result && typeof result === "object" && result.constructor?.name === "Unit") {
+        this.cellstatus[row][col] = cellstatus.iscomputed;
+        this.tableData[row][col] = result;
+        return result; 
+    }
+    
+    // Check if result is already a plain JavaScript array
+    if (Array.isArray(result)) {
+        return this.fillInMatrix(row, col, result);
+    }
+    
+    // Try to parse as JSON only if it's a string (legacy support)
+    if (typeof result === "string") {
+        try {
+            const parsed = JSON.parse(result);
+            if (Array.isArray(parsed)) {
+                return this.fillInMatrix(row, col, parsed);
+            }
+        } catch {
+            // Not JSON, continue with regular handling
         }
     }
+
+    // Regular scalar result
+    this.cellstatus[row][col] = cellstatus.iscomputed;
+    this.tableData[row][col] = result;
+    return result;
+} catch (error) {
+    this.errors[row][col] = error.message;
+    this.cellstatus[row][col] = cellstatus.iscomputed;
+    this.tableData[row][col] = null;
+    const r = this.cords2ref(row, col);
+    this.debug(`error computing cell ${r}`);
+    return null;
 }
+
+        }
+    }
 
     fillInMatrix(row: number, col: number, parsed: any[][]): any {
         //now we got a matrix or vector we have to clear recompute the values of all the
@@ -625,102 +642,102 @@ export class TableEvaluator {
     }
 
 
-unfoldRange(startRow: number, endRow: number, startCol: number, endCol: number, formulaPos: [number, number] = [0, 0], matrix = false): string {
-    const [formulaRow, formulaCol] = formulaPos;
-    [startRow, endRow] = startRow > endRow ? [endRow, startRow] : [startRow, endRow];
-    [startCol, endCol] = startCol > endCol ? [endCol, startCol] : [startCol, endCol];
+    unfoldRange(startRow: number, endRow: number, startCol: number, endCol: number, formulaPos: [number, number] = [0, 0], matrix = false): string {
+        const [formulaRow, formulaCol] = formulaPos;
+        [startRow, endRow] = startRow > endRow ? [endRow, startRow] : [startRow, endRow];
+        [startCol, endCol] = startCol > endCol ? [endCol, startCol] : [startCol, endCol];
 
-    endRow = Math.min(endRow, this.maxrows - 1);
-    endCol = Math.min(endCol, this.maxcols - 1);
+        endRow = Math.min(endRow, this.maxrows - 1);
+        endCol = Math.min(endCol, this.maxcols - 1);
 
-    // Track units in this range
-    let detectedUnit: string | null = null;
+        // Track units in this range
+        let detectedUnit: string | null = null;
 
-    if (matrix) {
-        // For matrix notation [a2:c4], preserve 2D structure
-        const rowArray = [];
+        if (matrix) {
+            // For matrix notation [a2:c4], preserve 2D structure
+            const rowArray = [];
 
-        for (let r = startRow; r <= endRow; r++) {
-            const colArray = [];
+            for (let r = startRow; r <= endRow; r++) {
+                const colArray = [];
 
-            for (let c = startCol; c <= endCol; c++) {
-                this.parents[formulaRow][formulaCol].push([r, c]);
-                this.children[r][c].push([formulaRow, formulaCol]);
+                for (let c = startCol; c <= endCol; c++) {
+                    this.parents[formulaRow][formulaCol].push([r, c]);
+                    this.children[r][c].push([formulaRow, formulaCol]);
 
-                const val = this.getValueByCoordinates(r, c);
-                const originalVal = this.tableData[r][c];
+                    const val = this.getValueByCoordinates(r, c);
+                    const originalVal = this.tableData[r][c];
 
-                // Check if this cell has a unit
-                if (typeof originalVal === "string" && originalVal) {
-                    const unitMatch = originalVal.match(/^(-?\d*\.?\d+)\s*([a-zA-Z]+)/);
-                    if (unitMatch && !detectedUnit) {
-                        detectedUnit = unitMatch[2];
+                    // Check if this cell has a unit
+                    if (typeof originalVal === "string" && originalVal) {
+                        const unitMatch = originalVal.match(/^(-?\d*\.?\d+)\s*([a-zA-Z]+)/);
+                        if (unitMatch && !detectedUnit) {
+                            detectedUnit = unitMatch[2];
+                        }
                     }
+
+                    colArray.push(val);
                 }
-
-                colArray.push(val);
+                rowArray.push(colArray);
             }
-            rowArray.push(colArray);
-        }
 
-        // Handle units for matrix format
-        if (detectedUnit) {
-            const processedRows = rowArray.map(row =>
-                row.map(val => {
+            // Handle units for matrix format
+            if (detectedUnit) {
+                const processedRows = rowArray.map(row =>
+                    row.map(val => {
+                        if (typeof val === "string" && !val.includes(detectedUnit)) return `0 ${detectedUnit}`;
+                        if (typeof val === "number") return `${val} ${detectedUnit}`;
+                        return val;
+                    })
+                );
+
+                // Format as nested arrays: [[1,2,3],[4,5,6],[7,8,9]]
+                const matrixString = processedRows.map(row => `[${row.join(",")}]`).join(",");
+                return `[${matrixString}]`;
+            }
+
+            // No units - format as nested arrays
+            const matrixString = rowArray.map(row => `[${row.join(",")}]`).join(",");
+            return `[${matrixString}]`;
+
+        } else {
+            // For range notation a2:c4, flatten to 1D array (existing logic)
+            const values = [];
+
+            for (let r = startRow; r <= endRow; r++) {
+                for (let c = startCol; c <= endCol; c++) {
+                    this.parents[formulaRow][formulaCol].push([r, c]);
+                    this.children[r][c].push([formulaRow, formulaCol]);
+
+                    const val = this.getValueByCoordinates(r, c);
+                    const originalVal = this.tableData[r][c];
+
+                    // Check if this cell has a unit
+                    if (typeof originalVal === "string" && originalVal) {
+                        const unitMatch = originalVal.match(/^(-?\d*\.?\d+)\s*([a-zA-Z]+)/);
+                        if (unitMatch && !detectedUnit) {
+                            detectedUnit = unitMatch[2];
+                        }
+                    }
+
+                    values.push(val);
+                }
+            }
+
+            // Handle units for flat array format
+            if (detectedUnit) {
+                const processedValues = values.map(val => {
                     if (typeof val === "string" && !val.includes(detectedUnit)) return `0 ${detectedUnit}`;
                     if (typeof val === "number") return `${val} ${detectedUnit}`;
                     return val;
-                })
-            );
+                });
 
-            // Format as nested arrays: [[1,2,3],[4,5,6],[7,8,9]]
-            const matrixString = processedRows.map(row => `[${row.join(",")}]`).join(",");
-            return `[${matrixString}]`;
-        }
-
-        // No units - format as nested arrays
-        const matrixString = rowArray.map(row => `[${row.join(",")}]`).join(",");
-        return `[${matrixString}]`;
-
-    } else {
-        // For range notation a2:c4, flatten to 1D array (existing logic)
-        const values = [];
-
-        for (let r = startRow; r <= endRow; r++) {
-            for (let c = startCol; c <= endCol; c++) {
-                this.parents[formulaRow][formulaCol].push([r, c]);
-                this.children[r][c].push([formulaRow, formulaCol]);
-
-                const val = this.getValueByCoordinates(r, c);
-                const originalVal = this.tableData[r][c];
-
-                // Check if this cell has a unit
-                if (typeof originalVal === "string" && originalVal) {
-                    const unitMatch = originalVal.match(/^(-?\d*\.?\d+)\s*([a-zA-Z]+)/);
-                    if (unitMatch && !detectedUnit) {
-                        detectedUnit = unitMatch[2];
-                    }
-                }
-
-                values.push(val);
+                return processedValues.join(",");
             }
+
+            // No units detected, return as flat array
+            return values.join(",");
         }
-
-        // Handle units for flat array format
-        if (detectedUnit) {
-            const processedValues = values.map(val => {
-                if (typeof val === "string" && !val.includes(detectedUnit)) return `0 ${detectedUnit}`;
-                if (typeof val === "number") return `${val} ${detectedUnit}`;
-                return val;
-            });
-
-            return processedValues.join(",");
-        }
-
-        // No units detected, return as flat array
-        return values.join(",");
     }
-}
 
 
     private sanitizeFormula(formula: string): string {
