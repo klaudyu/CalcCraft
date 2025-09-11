@@ -102,7 +102,7 @@ export class TableEvaluator {
                     this.formulaData[rowIndex][colIndex] = cellContent;
                     this.cellstatus[rowIndex][colIndex] = cellstatus.none;
                     this.celltype[rowIndex][colIndex] = celltype.formula;
-                } else {
+                } else { //number or text
                     this.formulaData[rowIndex][colIndex] = null;
                     this.cellstatus[rowIndex][colIndex] = cellstatus.iscomputed;
                     this.celltype[rowIndex][colIndex] = celltype.number;

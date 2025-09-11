@@ -29,7 +29,9 @@ export const DefaultSettings = {
 	formula_background_parents_dark: "#1f5656",
 	formula_font_parents_dark: "#dff5fb",
 	formula_background_children_dark: "#5c5275",
-	formula_font_children_dark: "#dcffa8"
+	formula_font_children_dark: "#dcffa8",
+	enableClassFilter: false,
+    requiredClass: "calccraft",
 };
 
 export class CalcCraftSettingsTab extends PluginSettingTab {
@@ -84,6 +86,54 @@ export class CalcCraftSettingsTab extends PluginSettingTab {
 					//this.plugin.updatecssvars();
 				})
 			);
+
+    new Setting(containerEl)
+        .setName("Only process pages with specific cssclass")
+        .setDesc("When enabled, only pages with the specified cssclass in frontmatter will be processed")
+        .addToggle(toggle =>
+            toggle.setValue(this.plugin.settings.enableClassFilter).onChange(async value => {
+                this.plugin.settings.enableClassFilter = value;
+                await this.plugin.saveSettings();
+                this.display(); // Refresh to show/hide class input
+                this.reloadPages();
+            })
+        );
+
+    // Only show class input when filter is enabled
+if (this.plugin.settings.enableClassFilter) {
+    new Setting(containerEl)
+        .setName("Required cssclass")
+        .setDesc("Pages must have this cssclass in frontmatter to be processed")
+        .addText(text => {
+            text
+                .setPlaceholder("calccraft")
+                .setValue(this.plugin.settings.requiredClass)
+                .onChange(async value => {
+                    // Save setting immediately but don't reload
+                    this.plugin.settings.requiredClass = value || "calccraft";
+                    await this.plugin.saveSettings();
+                });
+            
+            // Only reload pages when user finishes editing
+            text.inputEl.addEventListener('blur', () => {
+                this.reloadPages();
+            });
+        });
+}else {
+        // Show disabled input when filter is off
+        new Setting(containerEl)
+            .setName("Required cssclass")
+            .setDesc("Pages must have this cssclass in frontmatter to be processed (disabled)")
+            .addText(text => {
+                text
+                    .setPlaceholder("calccraft")
+                    .setValue(this.plugin.settings.requiredClass)
+                    .setDisabled(true);
+                // Make it visually grayed out
+                text.inputEl.style.opacity = "0.5";
+                text.inputEl.style.backgroundColor = "#f5f5f5";
+            });
+    }
 
 		const themes = ["light", "dark"];
 
