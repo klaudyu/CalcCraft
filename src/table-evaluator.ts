@@ -1,7 +1,7 @@
 // table-evaluator.ts
 import { evaluate } from "mathjs";
 
-const debug = true;
+const debug = false;
 
 enum celltype {
     number = 1,
@@ -20,6 +20,7 @@ class InfiniteLoop extends Error {
         this.name = "InfiniteLoop";
     }
 }
+
 
 export interface TableResult {
     values: any[][];
@@ -121,8 +122,6 @@ export class TableEvaluator {
             }
         }
     }
-
-    // Copy your exact methods below - I'll show the key ones:
 
     bool2nr(value: any): any {
         return typeof value === "boolean" ? +value : value;
@@ -230,7 +229,7 @@ export class TableEvaluator {
                 this.debug(`result is ${result}`);
 
                 if (result.constructor.name === "Unit") {
-                    // handle units
+                    // handle units ; TODO
                 } else {
                     const parsed = JSON.parse(result);
                     if (Array.isArray(parsed)) {
@@ -252,10 +251,7 @@ export class TableEvaluator {
         }
     }
 
-    // Continue with your other methods - copy them EXACTLY:
-
     fillInMatrix(row: number, col: number, parsed: any): any {
-        // Copy your EXACT implementation from main.ts
         const ismatrix = parsed.every((item: any) => Array.isArray(item));
         if (!ismatrix) parsed = parsed.map((n: any) => [n]);
 
@@ -546,7 +542,7 @@ export class TableEvaluator {
     debug(message: any): void {
         if (debug) {
             console.log(message);
+
         }
     }
-
 }

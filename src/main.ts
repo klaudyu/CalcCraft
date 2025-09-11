@@ -1,9 +1,8 @@
-//import { Plugin, MarkdownPostProcessorContext, App } from "obsidian";
 import { Plugin, MarkdownPostProcessorContext, App, MarkdownView, debounce } from "obsidian";
 import { CalcCraftSettingsTab, DefaultSettings } from "./settings";
 import { TableEvaluator } from "./table-evaluator";
 
-const debug = true;
+const debug = false;
 
 export default class CalcCraftPlugin extends Plugin {
 	settings: any = {};
@@ -21,9 +20,7 @@ export default class CalcCraftPlugin extends Plugin {
         await this.loadSettings();
         this.registerMarkdownPostProcessor(this.postProcessor.bind(this));
         
-        // ADD THIS LINE for edit mode support:
-        //this.registerEditorExtension(this.createEditExtension());
-        
+        // edit mode support:
         this.settings_tab = new CalcCraftSettingsTab(this.app, this);
         this.addSettingTab(this.settings_tab);
         this.debug("table formula plugin loaded");
@@ -35,11 +32,6 @@ export default class CalcCraftPlugin extends Plugin {
 		this.attachLivePreviewHooks();
     }
 
-    createEditExtension() {
-        // This will be a simple extension for now - we'll build it step by step
-        return [];
-    }
-
 	async onunload(): Promise<void> {
 		this.settings_tab.reloadPages();
 	}
@@ -48,7 +40,6 @@ export default class CalcCraftPlugin extends Plugin {
 
 
 
-	    // MODIFY your existing postProcessor method:
     async postProcessor(el: HTMLElement, ctx: MarkdownPostProcessorContext) {
         el.querySelectorAll("table").forEach((tableEl, index) => {
             // 1. Extract table data into a grid
@@ -80,16 +71,9 @@ export default class CalcCraftPlugin extends Plugin {
             if (wrapper) {
                 // Live Preview mode - get content from wrapper
                 cellContent = wrapper.textContent || "";
-                console.log(`Live Preview cell [${i},${j}]:`, `"${cellContent}"`, {
-                    wrapperText: wrapper.textContent,
-                    wrapperHTML: wrapper.innerHTML,
-                    hasOverlay: wrapper.classList.contains('calc-overlay-cell'),
-                    dataDisplay: wrapper.dataset.calcDisplay
-                });
             } else {
                 // Reading mode - get content normally
                 cellContent = cellEl.textContent || "";
-                console.log(`Reading mode cell [${i},${j}]:`, `"${cellContent}"`);
             }
             
             gridData[i][j] = cellContent;
@@ -99,37 +83,7 @@ export default class CalcCraftPlugin extends Plugin {
     return gridData;
 }
 
-private _extractTableGrid(tableEl: HTMLTableElement): string[][] {
-    const rows = Array.from(tableEl.querySelectorAll("tr")).slice(this.rowOffset);
-    const gridData: string[][] = [];
 
-    rows.forEach((rowEl, i) => {
-        const cells = Array.from(rowEl.querySelectorAll("td, th")).slice(this.colOffset);
-        gridData[i] = [];
-        
-        cells.forEach((cellEl, j) => {
-            const cellContent = cellEl.textContent || "";
-            gridData[i][j] = cellContent;
-            
-            // DEBUG: Log ALL cells with their positions
-            console.log(`Cell [${i},${j}] content:`, `"${cellContent}"`);
-            
-            // Extra debug for the problematic cell A2 (row 1, col 0)
-            if (i === 1 && j === 0) {
-                console.log("A2 DETAILED:", {
-                    textContent: cellEl.textContent,
-                    innerHTML: cellEl.innerHTML,
-                    title: cellEl.getAttribute('title')
-                });
-            }
-        });
-    });
-
-    return gridData;
-}
-
-
-   // MODIFY your existing display logic into this method:
 	private applyResultsToHTML(tableEl: HTMLTableElement, result: any, gridData: string[][], evaluator: TableEvaluator) {
         // Get HTML table structure
         this.htmlTable = [];
@@ -181,7 +135,6 @@ private _extractTableGrid(tableEl: HTMLTableElement): string[][] {
                     settings: this.settings 
                 };
 
-				// *** ADD THIS SECTION - Build HTML dependencies from evaluator ***
 				// Get parents from evaluator and convert to HTML elements
 				const parentCoords = evaluator.parents[rowIndex][colIndex];
 				parentCoords.forEach(([parentRow, parentCol]) => {
@@ -222,21 +175,6 @@ private _extractTableGrid(tableEl: HTMLTableElement): string[][] {
 						this.setFormattedCellValue(cellEl, computedValue);
 					}
 
-					/*
-                    if (error) {
-                        cellEl.classList.add("error-cell");
-                        if (this.settings.formula_background_error_toggle) {
-                            cellEl.classList.add("error-cell-colorenabled");
-                        }
-                        cellEl.textContent = "";
-                        error.split("<br>").forEach((text: string, index: number, array: string[]) => {
-                            cellEl.appendChild(document.createTextNode(text));
-                            if (index < array.length - 1)
-                                cellEl.appendChild(document.createElement("br"));
-                        });
-                    } else {
-                        this.setFormattedCellValue(cellEl, computedValue);
-                    }*/
                 } else if (cellType === 3) { // matrix
                     cellEl.classList.add("matrix-cell");
                     if (this.settings.formula_background_matrix_toggle) {
@@ -247,7 +185,6 @@ private _extractTableGrid(tableEl: HTMLTableElement): string[][] {
             }
         }
 
-        // Add event listeners for hover effects
         this.addTableEventListeners(tableEl);
     }
 
@@ -279,13 +216,11 @@ private _extractTableGrid(tableEl: HTMLTableElement): string[][] {
 			newCell.classList.add("label-cell", "row");
 			(newCell as any).CalcCraft = { parents: [], children: [] };
 		});
-		this.rowOffset = 0; // Skip the first row (column labels)
-		this.colOffset = 0; // Skip the first column (row labels)
+		this.rowOffset = 0; 
+		this.colOffset = 0; 
 
 	}
 
-	// Robust addSimpleLabels() - uses thead/tBodies to keep header vs body separate
-	// Paste this into your code or copy from the canvas doc.
 
 	private addSimpleLabels(tableEl: HTMLTableElement): void {
 		// avoid running twice
@@ -318,13 +253,6 @@ private _extractTableGrid(tableEl: HTMLTableElement): string[][] {
 		}
 	}
 
-/* Notes & tips:
- - Using table.tHead and table.tBodies is safer than querySelectorAll because
-   it avoids accidentally selecting header cells found inside tbody or nested tables.
- - Using dataset (cell.dataset.x) keeps attribute handling clean and is easier to read.
- - If your table has multiple TBODY sections, iterate all of tableEl.tBodies instead of just the first.
- - CSS should target thead th[data-col-letter] and tbody td[data-row-number] so header/body are separated.
-*/
 private setFormattedCellValue(cellEl: HTMLElement, value: any, error?: string): void {
     let data = value;
     if (typeof data === "number" && this.settings.precision >= 0) {
@@ -347,96 +275,7 @@ private setFormattedCellValue(cellEl: HTMLElement, value: any, error?: string): 
     // Reading view: write value directly
     cellEl.textContent = error || String(data);
 }
-private __setFormattedCellValue(cellEl: HTMLElement, value: any, error?: string): void {
-    let data = value;
-    if (typeof data === "number" && this.settings.precision >= 0) {
-        const decimalPart = String(data).split(".")[1];
-        if (decimalPart && decimalPart.length > this.settings.precision) {
-            data = data.toFixed(this.settings.precision);
-        }
-    }
 
-    // Live Preview: overlay on the wrapper
-    const wrapper = cellEl.querySelector<HTMLElement>(".table-cell-wrapper");
-    if (wrapper) {
-        // For errors, show error in overlay but preserve original formula in DOM
-        const displayValue = error || String(data);
-        wrapper.dataset.calcDisplay = displayValue;
-        wrapper.classList.add("calc-overlay-cell");
-        
-        // NEVER modify the wrapper's textContent if there's an error
-        // The original formula should remain in the DOM
-        return;
-    }
-
-    // Reading view: write value directly (errors will be handled by CSS styling)
-    cellEl.textContent = error || String(data);
-}
-
-	private _setFormattedCellValue(cellEl: HTMLElement, value: any): void {
-    let data = value;
-    if (typeof data === "number" && this.settings.precision >= 0) {
-        const decimalPart = String(data).split(".")[1];
-        if (decimalPart && decimalPart.length > this.settings.precision) {
-            data = data.toFixed(this.settings.precision);
-        }
-    }
-
-    // Live Preview: overlay on the wrapper
-    const wrapper = cellEl.querySelector<HTMLElement>(".table-cell-wrapper");
-    if (wrapper) {
-        wrapper.dataset.calcDisplay = String(data);
-        wrapper.classList.add("calc-overlay-cell");
-        return;
-    }
-
-    // Reading view: write value directly
-    cellEl.textContent = String(data);
-}
-
-	
-
-	private _setFormattedCellValue(cellEl: HTMLElement, value: any): void {
-		let data = value;
-		if (typeof data === "number" && this.settings.precision >= 0) {
-			const decimalPart = String(data).split(".")[1];
-			if (decimalPart && decimalPart.length > this.settings.precision) {
-				data = data.toFixed(this.settings.precision);
-			}
-		}
-
-		   // DEBUG: Check what's in the cell title/tooltip
-    const title = cellEl.getAttribute("title");
-    if (title) {
-        console.log("Cell title (original formula):", title);
-        console.log("Computed value:", data);
-    }
-
-		// Live Preview: overlay on the wrapper
-		const wrapper = cellEl.querySelector<HTMLElement>(".table-cell-wrapper");
-		if (wrapper) {
-			wrapper.dataset.calcDisplay = String(data);
-			wrapper.classList.add("calc-overlay-cell");
-			return; // <-- do NOT set textContent in Live Preview
-		}
-
-
-		cellEl.textContent = String(data);
-	}
-
-
-	/*
-	async	putDataInHtml(cellEl: HTMLElement, rowIndex: number, colIndex: number): void {
-		let data = this.tableData[rowIndex][colIndex];
-		if (typeof data === "number" && this.settings.precision >= 0) {
-			const decimalPart = String(data).split(".")[1];
-			if (decimalPart && decimalPart.length > this.settings.precision) {
-				data = data.toFixed(this.settings.precision);
-			}
-		}
-		cellEl.textContent = data;
-		//cellEl.textContent = String(data);
-	}*/
 
 	async loadSettings() {
 		this.settings = Object.assign({}, DefaultSettings, await this.loadData());
@@ -460,13 +299,9 @@ private __setFormattedCellValue(cellEl: HTMLElement, value: any, error?: string)
 			}
 		}
 
-		/*document.documentElement.style.setProperty(
-			"--CalcCraft-formula-borders",
-			this.settings.showBorders ? " 2px double" : ""
-		);*/
 	}
 
-	    // ADD event listeners method:
+	// ADD event listeners method:
     private addTableEventListeners(tableEl: HTMLTableElement): void {
 
 			// Attach a single 'mouseover' event listener to the table
@@ -476,7 +311,7 @@ private __setFormattedCellValue(cellEl: HTMLElement, value: any, error?: string)
 				if (!cellEl) return; // No cell? Get outta here.
 				cellEl.classList.add("cell-active");
 				if ((cellEl as any)?.CalcCraft == undefined) {
-					console.log("the cell doesnt contain calccraft")
+					//console.log("the cell doesnt contain calccraft")
 					return;
 				}
 
@@ -509,11 +344,6 @@ private __setFormattedCellValue(cellEl: HTMLElement, value: any, error?: string)
 				if (!cellEl) return; // No cell? Get outta here.
 				cellEl.classList.remove("cell-active");
 
-				/*
-                let existingSVG = document.querySelector("svg");
-                if (existingSVG) {
-                    existingSVG.remove();
-                }*/
 				if ((cellEl as any)?.CalcCraft == undefined) return;
 				if (
 					cellEl.classList.contains("formula-cell") ||
@@ -539,12 +369,8 @@ private __setFormattedCellValue(cellEl: HTMLElement, value: any, error?: string)
         }
     }
 
-
-
-
-	// Add these methods to your CalcCraftPlugin class in main.ts:
-
-private recomputeLivePreview = debounce(() => {
+//private recomputeLivePreview = debounce(() => {
+private recomputeLivePreview = () => {
     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
     const root = (view as any)?.editor?.cm?.contentDOM as HTMLElement | undefined;
     if (!root) return;
@@ -553,7 +379,7 @@ private recomputeLivePreview = debounce(() => {
     
     // Reuse your existing processor here:
     this.postProcessor(root, {} as any);
-}, 75, true);
+} //, 300, true);
 
 private attachLivePreviewHooks = () => {
     this.detachLivePreviewHooks();
