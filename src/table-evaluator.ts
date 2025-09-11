@@ -183,6 +183,9 @@ export class TableEvaluator {
     }
 
     getValueByCoordinates(row: number, col: number) {
+        if (row < 0 || row >= this.maxrows || col < 0 || col >= this.maxcols) {
+            throw new Error(`Cell coordinates [${row},${col}] out of bounds`);
+        }
         const r = this.cords2ref(row, col);
         this.debug(`getValueByCoordinates ${r}`);
 
@@ -210,9 +213,12 @@ export class TableEvaluator {
                 this.debug(`we are asked to fill in at ${this.cords2ref(row,col)} with formula: ${formula}`);
             }
 
+            const sanitizedFormula = this.sanitizeFormula(formula);
+
+
             let processedformula;
             try {
-                processedformula = this.parsefunction(formula, [row, col]);
+                processedformula = this.parsefunction(sanitizedFormula, [row, col]);
             } catch (error) {
                 if (error instanceof InfiniteLoop) {
                     const ref = this.cords2ref(row, col);
@@ -225,13 +231,36 @@ export class TableEvaluator {
 
             try {
                 this.debug(`we will evaluate the formula: ${processedformula}`);
-                const result = evaluate(processedformula);
+                // SANITIZE THE PROCESSED FORMULA TOO
+                const finalSanitizedFormula = this.sanitizeProcessedFormula(processedformula);
+                const result = evaluate(finalSanitizedFormula);
                 this.debug(`result is ${result}`);
 
                 if (result.constructor.name === "Unit") {
                     // handle units ; TODO
                 } else {
-                    const parsed = JSON.parse(result);
+                    try {
+                        let parsed;
+                        if (typeof result === 'string' && result.trim().startsWith('[')) {
+                            parsed = JSON.parse(result);
+                        } else if (Array.isArray(result)) {
+                            parsed = result;
+                        } else {
+                            // Single value, not an array
+                            this.cellstatus[row][col] = cellstatus.iscomputed;
+                            this.tableData[row][col] = result;
+                            return result;
+                        }
+
+                        if (Array.isArray(parsed)) {
+                            return this.fillInMatrix(row, col, parsed);
+                        }
+                    } catch (error) {
+                        // Not JSON, treat as regular value
+                        this.cellstatus[row][col] = cellstatus.iscomputed;
+                        this.tableData[row][col] = result;
+                        return result;
+                    }
                     if (Array.isArray(parsed)) {
                         return this.fillInMatrix(row, col, parsed);
                     }
@@ -254,6 +283,15 @@ export class TableEvaluator {
     fillInMatrix(row: number, col: number, parsed: any): any {
         const ismatrix = parsed.every((item: any) => Array.isArray(item));
         if (!ismatrix) parsed = parsed.map((n: any) => [n]);
+
+        // Check if matrix fits in table
+        const maxRow = row + parsed.length;
+        const maxCol = col + Math.max(...parsed.map((r: any[]) => r.length));
+
+        if (maxRow > this.maxrows || maxCol > this.maxcols) {
+            throw new Error("Matrix extends beyond table boundaries");
+        }
+
 
         this.copyArrayValues(parsed, this.tableData, row, col);
         this.cellstatus[row][col] = cellstatus.iscomputed;
@@ -538,6 +576,56 @@ export class TableEvaluator {
 		this.debug(`range text ${rangetxt}`);
 		return rangetxt;
 	}
+
+    private sanitizeFormula(formula: string): string {
+        // Remove potentially dangerous patterns
+        const dangerous = [
+            /import\s*\(/gi,
+            /require\s*\(/gi,
+            /eval\s*\(/gi,
+            /Function\s*\(/gi,
+            /constructor/gi,
+            /prototype/gi,
+            /__proto__/gi,
+            /process\./gi,
+            /global\./gi,
+            /window\./gi,
+            /document\./gi
+        ];
+
+        for (const pattern of dangerous) {
+            if (pattern.test(formula)) {
+                throw new Error(`Formula contains forbidden pattern: ${pattern.source}`);
+            }
+        }
+
+        // Limit formula length to prevent DoS
+        if (formula.length > 1000) {
+            throw new Error("Formula too long");
+        }
+
+        return formula.trim();
+    }
+
+    private sanitizeProcessedFormula(processedFormula: string): string {
+        // Validate the final formula before mathjs gets it
+
+        // Check for suspicious function calls that might have been constructed
+        const suspiciousPatterns = [
+            /eval\s*\(/gi,
+            /Function\s*\(/gi,
+            /constructor\s*\(/gi,
+            /\[.*["'].*["'].*\]/gi, // bracket notation with strings
+        ];
+
+        for (const pattern of suspiciousPatterns) {
+            if (pattern.test(processedFormula)) {
+                throw new Error("Processed formula contains suspicious patterns");
+            }
+        }
+
+        return processedFormula;
+    }
 
     debug(message: any): void {
         if (debug) {

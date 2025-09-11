@@ -2,7 +2,7 @@ import { PluginSettingTab, Setting } from "obsidian";
 import { buyMeACoffee, paypal, revolut } from "./support";
 
 export const DefaultSettings = {
-	precision: "-1",
+	precision: -1,
 	showLabels: true,
 	formula_background_color_toggle: true,
 	showBorders: true,
@@ -50,9 +50,15 @@ export class CalcCraftSettingsTab extends PluginSettingTab {
 			.addText(text =>
 				text
 					.setPlaceholder("-1")
-					.setValue(this.plugin.settings.precision)
+					.setValue(this.plugin.settings.precision.toString())
 					.onChange(async value => {
-						this.plugin.settings.precision = value;
+						const numValue = parseInt(value);
+						if (isNaN(numValue)) {
+							// Show error or use default
+							this.plugin.settings.precision = -1;
+						} else {
+							this.plugin.settings.precision = numValue;
+						}
 						await this.plugin.saveSettings();
 						this.reloadPages();
 					})

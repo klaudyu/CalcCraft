@@ -33,55 +33,87 @@ export default class CalcCraftPlugin extends Plugin {
     }
 
 	async onunload(): Promise<void> {
+		this.detachLivePreviewHooks(); // add this
 		this.settings_tab.reloadPages();
+
+		// Clear any remaining references
+		this.htmlTable = [];
+		this.lpCleanup = [];
 	}
 
 
+	async postProcessor(el: HTMLElement, ctx: MarkdownPostProcessorContext) {
+		el.querySelectorAll("table").forEach((tableEl, index) => {
+			try {
+				const gridData = this.extractTableGrid(tableEl);
+				(tableEl as any).CalcCraft = { settings: this.settings };
 
+				const evaluator = new TableEvaluator();
+				const result = evaluator.evaluateTable(gridData);
 
-
-    async postProcessor(el: HTMLElement, ctx: MarkdownPostProcessorContext) {
-        el.querySelectorAll("table").forEach((tableEl, index) => {
-            // 1. Extract table data into a grid
-            const gridData = this.extractTableGrid(tableEl);
-			(tableEl as any).CalcCraft = { settings: this.settings };
-            
-            // 2. Use the evaluator
-            const evaluator = new TableEvaluator();
-            const result = evaluator.evaluateTable(gridData);
-            
-            // 3. Apply results to HTML
-            this.applyResultsToHTML(tableEl, result, gridData, evaluator);
-        });
-    }
+				this.applyResultsToHTML(tableEl, result, gridData, evaluator);
+			} catch (error) {
+				console.error(`CalcCraft: Error processing table ${index}:`, error);
+				tableEl.setAttribute('data-calccraft-error', 'true');
+			}
+		});
+	}
 
 	private extractTableGrid(tableEl: HTMLTableElement): string[][] {
-    const rows = Array.from(tableEl.querySelectorAll("tr")).slice(this.rowOffset);
-    const gridData: string[][] = [];
+		const rows = Array.from(tableEl.querySelectorAll("tr"));
+		if (rows.length === 0) return [];
 
-    rows.forEach((rowEl, i) => {
-        const cells = Array.from(rowEl.querySelectorAll("td, th")).slice(this.colOffset);
-        gridData[i] = [];
-        
-        cells.forEach((cellEl, j) => {
-            // In Live Preview, content might be inside .table-cell-wrapper
-            const wrapper = cellEl.querySelector('.table-cell-wrapper');
-            let cellContent;
-            
-            if (wrapper) {
-                // Live Preview mode - get content from wrapper
-                cellContent = wrapper.textContent || "";
-            } else {
-                // Reading mode - get content normally
-                cellContent = cellEl.textContent || "";
-            }
-            
-            gridData[i][j] = cellContent;
-        });
-    });
+		const validRows = rows.slice(this.rowOffset);
+		if (validRows.length === 0) return [];
 
-    return gridData;
-}
+		const gridData: string[][] = [];
+
+		validRows.forEach((rowEl, i) => {
+			const cells = Array.from(rowEl.querySelectorAll("td, th"));
+			const validCells = cells.slice(this.colOffset);
+			gridData[i] = [];
+
+			validCells.forEach((cellEl, j) => {
+				const wrapper = cellEl.querySelector('.table-cell-wrapper');
+				let cellContent = wrapper ?
+					(wrapper.textContent || "") :
+					(cellEl.textContent || "");
+
+				gridData[i][j] = cellContent.trim();
+			});
+		});
+
+		return gridData;
+	}
+	
+	/*
+	private _extractTableGrid(tableEl: HTMLTableElement): string[][] {
+		const rows = Array.from(tableEl.querySelectorAll("tr")).slice(this.rowOffset);
+		const gridData: string[][] = [];
+
+		rows.forEach((rowEl, i) => {
+			const cells = Array.from(rowEl.querySelectorAll("td, th")).slice(this.colOffset);
+			gridData[i] = [];
+
+			cells.forEach((cellEl, j) => {
+				// In Live Preview, content might be inside .table-cell-wrapper
+				const wrapper = cellEl.querySelector('.table-cell-wrapper');
+				let cellContent;
+
+				if (wrapper) {
+					// Live Preview mode - get content from wrapper
+					cellContent = wrapper.textContent || "";
+				} else {
+					// Reading mode - get content normally
+					cellContent = cellEl.textContent || "";
+				}
+
+				gridData[i][j] = cellContent;
+			});
+		});
+
+		return gridData;
+	}*/
 
 
 	private applyResultsToHTML(tableEl: HTMLTableElement, result: any, gridData: string[][], evaluator: TableEvaluator) {
