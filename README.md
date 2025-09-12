@@ -174,15 +174,18 @@ values that don't fit in the existing table are disgarded
 | pen   |                   |           |     |
 | apple |                   |           |     |
 | =pi   |                   |           |     |
+
 ![ ](./doc/images/README-20250912-1518-848.webp)
+
 ### change units
 | inch    | cm                  |     |
 | ------- | ------------------- | --- |
 | 12 inch | =to(unit(a2), "cm") |     |
 | 5 inch  | =to(unit(a3), "cm") |     |
+
 ![ ](./doc/images/README-20250912-1519-906.webp)
+
 ### more complex units
-![ ](./doc/images/README-20250912-1519-976.webp)
 
 | distance | time     | speed         |
 | -------- | -------- | ------------- |
@@ -191,6 +194,9 @@ values that don't fit in the existing table are disgarded
 | 100 km   | 7 day    |               |
 | = 500km  | 0.5 year |               |
 |          |          |               |
+
+![ ](./doc/images/README-20250912-1519-976.webp)
+
 
 | initial speed | final spped | time | acc                   |
 | ------------- | ----------- | ---- | --------------------- |
@@ -206,6 +212,7 @@ values that don't fit in the existing table are disgarded
 | gravitationConstant | =gravitationConstant |
 | planckConstant      | =planckConstant      |
 ![ ](./doc/images/README-20250912-1519-573.webp)
+
 ### more complicated dependencies with errors
 
 |                  3                  | 0   | 0   | 0   | e                   | f   |             |
@@ -225,6 +232,7 @@ values that don't fit in the existing table are disgarded
 |                                     |     |     |     |                     |     |             |
 
 ![ ](./doc/images/README-20250912-1519-473.webp)
+
 ## Configuration and Setup
 
 ### Class-based Processing
