@@ -642,7 +642,7 @@ try {
     }
 
 
-    unfoldRange(startRow: number, endRow: number, startCol: number, endCol: number, formulaPos: [number, number] = [0, 0], matrix = false): string {
+        unfoldRange(startRow: number, endRow: number, startCol: number, endCol: number, formulaPos: [number, number] = [0, 0], matrix = false, nullAsZero=true): string {
         const [formulaRow, formulaCol] = formulaPos;
         [startRow, endRow] = startRow > endRow ? [endRow, startRow] : [startRow, endRow];
         [startCol, endCol] = startCol > endCol ? [endCol, startCol] : [startCol, endCol];
@@ -650,92 +650,41 @@ try {
         endRow = Math.min(endRow, this.maxrows - 1);
         endCol = Math.min(endCol, this.maxcols - 1);
 
-        // Track units in this range
-        let detectedUnit: string | null = null;
+        // For matrix notation [a2:c4], preserve 2D structure
+        const rowArray = [];
+
+        for (let r = startRow; r <= endRow; r++) {
+            const colArray = [];
+
+            for (let c = startCol; c <= endCol; c++) {
+                this.parents[formulaRow][formulaCol].push([r, c]);
+                this.children[r][c].push([formulaRow, formulaCol]);
+
+                const val = this.getValueByCoordinates(r, c);
+
+                // For null values in matrices, use 0 to maintain matrix structure
+                //const matrixVal = val === null ? "null" : val;
+                colArray.push(val);
+            }
+            rowArray.push(colArray);
+        }
+
+        const fmt = (v: any) => {
+            if (v === null) return nullAsZero ? "0" : "null";
+            // for string values wrapped in quotes, change this to: return typeof v === "string" ? `"${v}"` : String(v);
+            return String(v);
+        };
 
         if (matrix) {
-            // For matrix notation [a2:c4], preserve 2D structure
-            const rowArray = [];
-
-            for (let r = startRow; r <= endRow; r++) {
-                const colArray = [];
-
-                for (let c = startCol; c <= endCol; c++) {
-                    this.parents[formulaRow][formulaCol].push([r, c]);
-                    this.children[r][c].push([formulaRow, formulaCol]);
-
-                    const val = this.getValueByCoordinates(r, c);
-                    const originalVal = this.tableData[r][c];
-
-                    // Check if this cell has a unit
-                    if (typeof originalVal === "string" && originalVal) {
-                        const unitMatch = originalVal.match(/^(-?\d*\.?\d+)\s*([a-zA-Z]+)/);
-                        if (unitMatch && !detectedUnit) {
-                            detectedUnit = unitMatch[2];
-                        }
-                    }
-
-                    colArray.push(val);
-                }
-                rowArray.push(colArray);
-            }
-
-            // Handle units for matrix format
-            if (detectedUnit) {
-                const processedRows = rowArray.map(row =>
-                    row.map(val => {
-                        if (typeof val === "string" && !val.includes(detectedUnit)) return `0 ${detectedUnit}`;
-                        if (typeof val === "number") return `${val} ${detectedUnit}`;
-                        return val;
-                    })
-                );
-
-                // Format as nested arrays: [[1,2,3],[4,5,6],[7,8,9]]
-                const matrixString = processedRows.map(row => `[${row.join(",")}]`).join(",");
-                return `[${matrixString}]`;
-            }
-
-            // No units - format as nested arrays
-            const matrixString = rowArray.map(row => `[${row.join(",")}]`).join(",");
+            // produce e.g. [[1,2,3],[4,5,6]]
+            const matrixString = rowArray
+                .map(row => `[${row.map(v => fmt(v)).join(",")}]`)
+                .join(",");
             return `[${matrixString}]`;
-
         } else {
-            // For range notation a2:c4, flatten to 1D array (existing logic)
-            const values = [];
-
-            for (let r = startRow; r <= endRow; r++) {
-                for (let c = startCol; c <= endCol; c++) {
-                    this.parents[formulaRow][formulaCol].push([r, c]);
-                    this.children[r][c].push([formulaRow, formulaCol]);
-
-                    const val = this.getValueByCoordinates(r, c);
-                    const originalVal = this.tableData[r][c];
-
-                    // Check if this cell has a unit
-                    if (typeof originalVal === "string" && originalVal) {
-                        const unitMatch = originalVal.match(/^(-?\d*\.?\d+)\s*([a-zA-Z]+)/);
-                        if (unitMatch && !detectedUnit) {
-                            detectedUnit = unitMatch[2];
-                        }
-                    }
-
-                    values.push(val);
-                }
-            }
-
-            // Handle units for flat array format
-            if (detectedUnit) {
-                const processedValues = values.map(val => {
-                    if (typeof val === "string" && !val.includes(detectedUnit)) return `0 ${detectedUnit}`;
-                    if (typeof val === "number") return `${val} ${detectedUnit}`;
-                    return val;
-                });
-
-                return processedValues.join(",");
-            }
-
-            // No units detected, return as flat array
-            return values.join(",");
+            // flatten and produce e.g. 1,2,3,4,5
+            const flat: any[] = rowArray.flat();
+            return flat.map(v => fmt(v)).join(",");
         }
     }
 
