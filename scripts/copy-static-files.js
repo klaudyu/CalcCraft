@@ -1,7 +1,8 @@
 import { copyFileSync } from 'fs';
 import { existsSync, mkdirSync } from 'fs';
 
-const filesToCopy = ['manifest.json', 'README.md', 'main.js'];
+//const filesToCopy = ['manifest.json', 'README.md', 'main.js'];
+const filesToCopy = ['manifest.json', 'main.js'];
 const distDir = './dist';
 
 

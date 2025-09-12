@@ -13,8 +13,7 @@ The table is divided in columns (labeled from 'a' to 'z', and numerical rows)
 
 After expanding the expressions are evaluated using  [mathjs](https://mathjs.org/docs/reference/functions.html), therefore supporting many functions from there. Ranges between `[ ... ]` are expanded as matrices, and can be used for matrix operations.
 ### operations
-most of the functions from [mathjs](https://mathjs.org/docs/reference/functions.html)
-
+most of the functions from [mathjs](https://mathjs.org/docs/reference/functions.html) are supported.
 ### Real-time Formula Evaluation in Edit Mode
 - **Edit Mode**: Formulas remain visible while editing, with computed values shown as overlays
 - **Reading Mode**: Clean display with computed results only
@@ -34,7 +33,7 @@ summing all the values in the curent column from the second row to the cell abov
 #### Highlight involved cells
 The cells that influence the curent cell, are called `parents`, and the ones that depend on the curent cell are called `children`. Hovering the mouse over a cell, shows both the parents and the children, in customizable colors. This makes it easier to track the flow of data in the sheet. The colors can be customized for the dark theme and for the light theme.
 ### Highlighting errors
-If a cell while trying to be resolved loops back to itself, then a `loop` error is thrown and displayed. This is also valid for matrix operations, where a cell influences multiple cells.
+If a cell loops back to itself while trying to be computed, a `loop` error is thrown and displayed. This is also valid for matrix operations, where a cell influences multiple cells.
 
 ### Powered by MathJS with Units Support
 Formulas are evaluated using [mathjs](https://mathjs.org/docs/reference/functions.html)
@@ -42,123 +41,97 @@ Formulas are evaluated using [mathjs](https://mathjs.org/docs/reference/function
 - **Unit arithmetic**: `=5 kg + 3000 g` automatically converts and returns `8 kg`
 - **Unit conversion**: `=5 inch to cm` converts between unit systems
 - **Matrix operations with units**: Full support for unit calculations in ranges and matrices
-
 ### Matrix and Range Operations
 Ranges between `[...]` are expanded as matrices and can be used for matrix operations:
 - **Standard ranges**: `a1:c3` flattens to a 1D array for functions like `sum()`
 - **Matrix ranges**: `[a1:c3]` preserves 2D structure for matrix operations
-
 If the result is a vector or matrix, the output expands to multiple cells, and references for those cells are automatically recomputed.
-
-### Visual Feedback and Error Handling
-- **Cell highlighting**: Hover over cells to see dependencies
-- **Parent cells**: Cells this formula depends on (customizable colors)
-- **Children cells**: Cells that depend on this cell (customizable colors)
-- **Error indication**: Loop detection with clear visual feedback
-- **Customizable themes**: Different color schemes for light and dark modes
-
 ### Smart Processing Options
-- **Class filtering**: Only process tables in files with specific cssclass in frontmatter
-- **Edit-aware processing**: No interruption while actively typing or editing
-- **Live Preview support**: Real-time updates with proper event handling
-
-
+- **Class filtering**: Only process tables in files with specific `cssclass` in frontmatter
 ## Examples
-
 #### Expenses
-![ ](./doc/images/tutorial-20231024-1114-668.webp)
-![ ](./doc/images/tutorial-20231024-1111-365.webp)
+
+| Month     | Income      | Rent        | Groceries   | Entertainment | Savings                              |
+| --------- | ----------- | ----------- | ----------- | ------------- | ------------------------------------ |
+| January   | 1800        | 1000        | 300         | 200           | =[b2:b99]-[c2:c99]-[d2:d99]-[e2:e99] |
+| February  | 1700        | 1000        | 310         | 210           | =[b2:b99]-[c2:c99]-[d2:d99]-[e2:e99] |
+| March     | 1880        | 1000        | 320         | 220           | =[b2:b99]-[c2:c99]-[d2:d99]-[e2:e99] |
+| April     | 1720        | 1000        | 330         | 230           | =[b2:b99]-[c2:c99]-[d2:d99]-[e2:e99] |
+| **Total** | =sum(b2:b5) | =sum(c2:c5) | =sum(d2:d5) | =sum(e2:e5)   |                                      |
+
+![ ](./doc/images/README-20250912-1514-173.webp)
 
 ### simple sum, simple reference
-```
 | plums | bananas | fruits |
 | ----- | ------- | ------ |
 | 5     | 12      | =a2+b2 |
-```
-![ ](./doc/images/tutorial-20231024-1115-918.webp)
-
+![ ](./doc/images/README-20250912-1514-208.webp)
 ### simple sum, relative reference
 `[+-]?[0-9]+r[+-]?[0-9]+c`:
 examples:
 - `-2c+1r` : two columns left, one row down
 - `-0c-1r`: same column, 1 row up
 
-```
 | plums | bananas | fruits             |
 | ----- | ------- | ------------------ |
 | 5     | 12      | =(-2c+0r)+(-1c+0r) |
 | 7     | 5       | =(-2c+0r)+(-1c+0r) |
-```
-![ ](./doc/images/tutorial-20231024-1116-382.webp)
-### combination between letter and relative columns
+![ ](./doc/images/README-20250912-1515-274.webp)
+### combination between letter and relative rows
 examples:
 `a+1r`: column a, 1 row down
 
 ### ranges
-```
 | plums | bananas | fruits          |
 | ----- | ------- | --------------- |
 | 5     | 12      | =sum(a2:b4)     |
 | 7     | 5       | =sum(a2:b4) >20 |
 | 9     | 7       |                 |
-```
-
-![ ](./doc/images/tutorial-20231024-1117-10.webp)
+![ ](./doc/images/README-20250912-1515-799.webp)
 ### ranges with relative reference
 
-```
-| plums           | bananas       | fruits          |
-| --------------- | ------------- | --------------- |
-| 5               | 12            | =sum(a2:b4)     |
-| 7               | 5             | =sum(a2:b4) >20 |
-| 9               | 7             |                 |
-| =sum(a2:+0c-1r) | =sum(b2:b-1r) |                 |
-```
-![ ](./doc/images/tutorial-20231024-1118-893.webp)
+| plums           | bananas       | fruits        |
+| --------------- | ------------- | ------------- |
+| 5               | 12            | =sum(1c2:2c4) |
+| 7               | 5             | =sum(a2r:b4r) |
+| 9               | 7             |               |
+| =sum(a2:+0c-1r) | =sum(b2:b-1r) |               |
+![ ](./doc/images/README-20250912-1516-737.webp)
 ### vector sum
 `ranges in [ ... ]`
 formula is only in one cell, but fills values outside of it's cell
 values that don't fit in the existing table are disgarded
 
-```
 | plums | bananas | fruits           |
 | ----- | ------- | ---------------- |
 | 5     | 12      | =[a2:a4]+[b2:b4] |
 | 7     | 5       |                  |
 | 19    | 10      |                  |
-```
-
-![ ](./doc/images/tutorial-20231024-1118-940.webp)
+![ ](./doc/images/README-20250912-1516-235.webp)
 ### matrix operations
 #### transpose
-```
 | m1  |     |     |     |                     |     |     |
 | --- | --- | --- | --- | ------------------- | --- | --- |
 | 1   | 2   | 3   |     | =transpose([a2:c4]) |     |     |
 | 4   | 5   | 6   |     |                     |     |     |
 | 7   | 8   | 9   |     |                     |     |     |
-```
 
-![ ](./doc/images/tutorial-20231024-1119-209.webp)
+![ ](./doc/images/README-20250912-1517-497.webp)
 #### diagonal
 
-```
-| m1  |     |     |     |                |     | 
-| --- | --- | --- | --- | -------------- | --- | 
-| 1   | 2   | 3   |     | =diag([a2:c4]) |     | 
-| 4   | 5   | 6   |     |                |     | 
-| 7   | 8   | 9   |     |                |     | 
-```
-![ ](./doc/images/tutorial-20231024-1119-397.webp)
+| m1  |     |     |     |                |     |     |
+| --- | --- | --- | --- | -------------- | --- | --- |
+| 1   | 2   | 3   |     | =diag([a2:c4]) |     |     |
+| 4   | 5   | 6   |     |                |     |     |
+| 7   | 8   | 9   |     |                |     |     |
+![ ](./doc/images/README-20250912-1517-329.webp)
 #### matrix vector multiplication
-```
-| m1  |     |     |     | r1                |     | r2              | 
-| --- | --- | --- | --- | ----------------- | --- | --------------- |
-| 1   | 2   | 3   |     | =[a2:c4]\*[1,1,1] |     | =sum(a+0r:c+0r) |
-| 4   | 5   | 6   |     |                   |     | =sum(a+0r:c+0r) |
-| 7   | 8   | 9   |     |                   |     | =sum(a+0r:c+0r) |
-```
-![ ](./doc/images/tutorial-20231024-1121-623.webp)
+| m1  |     |     |     | r1                |     | r2              |     |
+| --- | --- | --- | --- | ----------------- | --- | --------------- | --- |
+| 1   | 2   | 3   |     | =[a2:c4]\*[1,1,1] |     | =sum(a+0r:c+0r) |     |
+| 4   | 5   | 6   |     |                   |     | =sum(a+0r:c+0r) |     |
+| 7   | 8   | 9   |     |                   |     | =sum(a+0r:c+0r) |     |
+![ ](./doc/images/README-20250912-1517-237.webp)
 #### determinant
 `=det([a2:c4])`
 
@@ -167,48 +140,74 @@ values that don't fit in the existing table are disgarded
 | 1   | 2   | 3   |     | =det([a2:c4]) |     |
 | 4   | 5   | 7   |     |               |     |
 | 7   | 8   | 9   |     |               |     |
+![ ](./doc/images/README-20250912-1517-34.webp)
 ### conditionals
 
-```
-| m1  |     |     |     | r1                      |     |     |
-| --- | --- | --- | --- | ----------------------- | --- | --- |
-| 1   | 2   | 3   |     | =([a2:c4]>=5).\*[a2:c4] |     |     | 
-| 4   | 5   | 6   |     |                         |     |     |
-| 7   | 8   | 9   |     |                         |     |     |
-```
+| m1  |     |     |     | r1                      |     |     |     |
+| --- | --- | --- | --- | ----------------------- | --- | --- | --- |
+| 1   | 2   | 3   |     | =([a2:c4]>=5).\*[a2:c4] |     |     |     |
+| 4   | 5   | 6   |     |                         |     |     |     |
+| 7   | 8   | 9   |     |                         |     |     |     |
 
-![ ](./doc/images/tutorial-20231024-1129-964.webp)
+![ ](./doc/images/README-20250912-1518-327.webp)
 #### generate numbers and map them
-![ ](./doc/images/tutorial-20231024-1142-991.webp)
-![ ](./doc/images/tutorial-20231024-1142-149.webp)
+
+| decimal                   | hex             | bin             | sin             | isprime             |
+| ------------------------- | --------------- | --------------- | --------------- | ------------------- |
+| =transpose(range(1,20,2)) | =map([a:a],hex) | =map([a:a],bin) | =map([a:a],sin) | =map([a:a],isPrime) |
+|                           |                 |                 |                 |                     |
+|                           |                 |                 |                 |                     |
+|                           |                 |                 |                 |                     |
+|                           |                 |                 |                 |                     |
+|                           |                 |                 |                 |                     |
+|                           |                 |                 |                 |                     |
+|                           |                 |                 |                 |                     |
+|                           |                 |                 |                 |                     |
+|                           |                 |                 |                 |                     |
+![ ](./doc/images/README-20250912-1518-573.webp)
 ### test if it's numeric
-![ ](./doc/images/tutorial-20231024-1142-839.webp)
-
-```
-| label |                   | numeric   |
-| ----- | ----------------- | --------- |
-| 3     | =isNumeric([a:a]) | =sum(b:b) |
-| not   |                   |           |
-| 2     |                   |           | 
-| pen   |                   |           |
-| apple |                   |           |
-| =pi   |                   |           |
-```
-
+| label | number?           | total     |     |
+| ----- | ----------------- | --------- | --- |
+| 3     | =isNumeric([a:a]) | =sum(b:b) |     |
+| not   |                   |           |     |
+| 2     |                   |           |     |
+| pen   |                   |           |     |
+| apple |                   |           |     |
+| =pi   |                   |           |     |
+![ ](./doc/images/README-20250912-1518-848.webp)
 ### change units
-![ ](./doc/images/tutorial-20231024-1143-377.webp)
+| inch    | cm                  |     |
+| ------- | ------------------- | --- |
+| 12 inch | =to(unit(a2), "cm") |     |
+| 5 inch  | =to(unit(a3), "cm") |     |
+![ ](./doc/images/README-20250912-1519-906.webp)
+### more complex units
+![ ](./doc/images/README-20250912-1519-976.webp)
 
-```
-| inch    | cm                  |
-| ------- | ------------------- |
-| 12 inch | =to(unit(a2), "cm") |
-| 5 inch  | =to(unit(a3), "cm") | 
-```
+| distance | time     | speed         |
+| -------- | -------- | ------------- |
+| 5 m      | 10 s     | =[a:a]./[b:b] |
+| 5 inch   | 10 mins  |               |
+| 100 km   | 7 day    |               |
+| = 500km  | 0.5 year |               |
+|          |          |               |
 
+| initial speed | final spped | time | acc                   |
+| ------------- | ----------- | ---- | --------------------- |
+| 10 km/h       | 100 km/h    | 10 s | =([b:b]-[a:a])./[c:c] |
+| 20 m/s        | 10 m/s      | 5 s  |                       |
+
+![ ](./doc/images/README-20250912-1519-155.webp)
+
+
+
+|                     |                      |
+| ------------------- | -------------------- |
+| gravitationConstant | =gravitationConstant |
+| planckConstant      | =planckConstant      |
+![ ](./doc/images/README-20250912-1519-573.webp)
 ### more complicated dependencies with errors
-![ ](./doc/images/tutorial-20231024-1425-201.webp)
 
-```
 |                  3                  | 0   | 0   | 0   | e                   | f   |             |
 |:-----------------------------------:| --- | --- | --- | ------------------- | --- | ----------- |
 |                  1                  | 3   | 4   | 8   | 8                   | 1   |             |
@@ -224,21 +223,14 @@ values that don't fit in the existing table are disgarded
 |                                     |     |     |     | =sum(a:f)           |     |             |
 |                                     |     |     |     |                     |     |             |
 |                                     |     |     |     |                     |     |             |
-```
 
-
+![ ](./doc/images/README-20250912-1519-473.webp)
 ## Configuration and Setup
 
 ### Class-based Processing
-Add to your note's frontmatter to enable processing:
-```yaml
----
-cssclass: calccraft
----
-```
-
-This allows selective processing - only notes with the specified cssclass will have their tables processed. Configure the required class name in plugin settings.
-
+To not process all notes, you can enable in settings process only pages with a specific `cssclass`.
+For that, rightclick on the tab, and select `add file property`, select `cssclasses` and add `calccraft` or the customized value you set in settings.
+This allows selective processing - only notes with the specified `cssclasses` will have their tables processed.
 ### Plugin Settings
 - **Decimal precision**: Control number of decimal places (-1 for default)
 - **Show labels**: Display row numbers and column letters
@@ -261,13 +253,11 @@ This allows selective processing - only notes with the specified cssclass will h
 CalcCraft now provides full edit mode support:
 - Formulas remain visible while editing
 - Computed values appear as overlays
-
 ### Live Preview Integration
 - Integration with Obsidian's Live Preview
 - Dynamic formula evaluation as you type
 - Proper event handling for smooth performance
 - Debounced updates to prevent excessive computation
-
 ### Performance Optimizations
 - Smart caching to avoid unnecessary recalculations
 - Edit-aware processing that respects active editing sessions
