@@ -80,26 +80,6 @@ export class CalcCraftSettingsTab extends PluginSettingTab {
 				})
 			);
 
-		// Only show separator input when grouping is enabled
-		if (this.plugin.settings.digitGrouping) {
-			new Setting(containerEl)
-				.setName("Grouping separator")
-				.setDesc("Character to use for digit grouping")
-				.addDropdown(dropdown => {
-					dropdown
-						.addOption(",", "Comma (1,234)")
-						.addOption(".", "Period (1.234)")
-						.addOption(" ", "Space (1 234)")
-						.addOption("'", "Apostrophe (1'234)")
-						.setValue(this.plugin.settings.groupingSeparator)
-						.onChange(async value => {
-							this.plugin.settings.groupingSeparator = value;
-							await this.plugin.saveSettings();
-							this.reloadPages();
-						});
-				});
-		}
-
 		new Setting(containerEl)
 			.setName("show labels")
 			.setDesc("show labels.")
