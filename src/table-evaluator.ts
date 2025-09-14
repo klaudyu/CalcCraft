@@ -284,7 +284,7 @@ export class TableEvaluator {
             } catch (error) {
                 if (error instanceof InfiniteLoop) {
                     const ref = this.cords2ref(row, col);
-                    this.errors[row][col] = "loop<br>" + error.message;
+                    this.errors[row][col] = "loop\n" + error.message;
                     throw new InfiniteLoop(`${ref}`);
                 }
                 this.errors[row][col] = error.message;
@@ -411,7 +411,7 @@ try {
         //pass the address of the root formula for the matrix,
         // and if a child tries to clean that, it throws an error
         if (this.cellstatus[row][col] != cellstatus.iscomputed) {
-            throw new Error("matrix<br>loop");
+            throw new Error("matrix\nloop");
         }
 
         //now that we filled the values in, we can recompute the children
@@ -451,7 +451,7 @@ try {
                 if (r === rootRow && c === rootCol) {
                     //we are trying to clean up the matrix cell
                     //which would force it to recompute
-                    throw new InfiniteLoop(`matrix<br>loop ${this.cords2ref(row, col)}`);
+                    throw new InfiniteLoop(`matrix\nloop ${this.cords2ref(row, col)}`);
                 }
                 this.debug("yes, cleanup");
                 this.cellstatus[r][c] = cellstatus.none;
@@ -487,7 +487,7 @@ try {
         if (!coords) throw new Error("invalid cell reference");
         const [row, col] = coords;
         if (row < 0 || row > this.maxrows - 1 || col < 0 || col > this.maxcols - 1) {
-            throw new Error("cell<br>out of<br>table");
+            throw new Error("cell\nout of\ntable");
         }
         this.parents[formulaRow][formulaCol].push([row, col]);
 

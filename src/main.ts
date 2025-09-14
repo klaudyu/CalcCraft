@@ -13,184 +13,194 @@ export default class CalcCraftPlugin extends Plugin {
 	rowOffset = 0;
 	htmlTable: HTMLElement[][] = [];
 	useBool = false; //keep true and false, otherwise convert them to 0 and 1
+	private suspendMutations = false;          // ignore MutationObserver notifications while we mutate
+	private isEvaluating = false;              // prevent re-entrant recompute runs
+	private recomputeTimer: number | null = null; // for debouncing recompute calls
 
 	private lpCleanup: Array<() => void> = [];
 
-private cssClassCache = new Map<string, string[]>();
+	private cssClassCache = new Map<string, string[]>();
 
-async onload() {
-    await this.loadSettings();
-    this.registerMarkdownPostProcessor(this.postProcessor.bind(this));
+	async onload() {
+		await this.loadSettings();
+		this.registerMarkdownPostProcessor(this.postProcessor.bind(this));
 
-    // edit mode support:
-    this.settings_tab = new CalcCraftSettingsTab(this.app, this);
-    this.addSettingTab(this.settings_tab);
-    this.debug("table formula plugin loaded");
-    this.settings_tab.reloadPages();
+		// edit mode support:
+		this.settings_tab = new CalcCraftSettingsTab(this.app, this);
+		this.addSettingTab(this.settings_tab);
+		this.debug("table formula plugin loaded");
+		this.settings_tab.reloadPages();
 
-    // Add Live Preview support:
-    this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.attachLivePreviewHooks()));
-    this.registerEvent(this.app.workspace.on("layout-change", () => this.attachLivePreviewHooks()));
-    this.attachLivePreviewHooks();
+		// Add Live Preview support:
+		this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.attachLivePreviewHooks()));
+		this.registerEvent(this.app.workspace.on("layout-change", () => this.attachLivePreviewHooks()));
+		this.attachLivePreviewHooks();
 
-    this.registerEvent(
-        this.app.metadataCache.on("changed", (file) => {
-            // Only refresh if class filter is enabled AND cssclass actually changed
-            if (this.settings.enableClassFilter) {
-                this.checkCssClassChange(file);
-            }
-        })
-    );
-}
+		this.registerEvent(
+			this.app.metadataCache.on("changed", (file) => {
+				// Only refresh if class filter is enabled AND cssclass actually changed
+				if (this.settings.enableClassFilter) {
+					this.checkCssClassChange(file);
+				}
+			})
+		);
+	}
 
-private extractCssClasses(frontmatter: any): string[] {
-    const classes: string[] = [];
-    
-    if (frontmatter?.cssclass) {
-        if (typeof frontmatter.cssclass === 'string') {
-            classes.push(...frontmatter.cssclass.split(/\s+/));
-        } else if (Array.isArray(frontmatter.cssclass)) {
-            classes.push(...frontmatter.cssclass);
-        }
-    }
-    
-    if (frontmatter?.cssclasses) {
-        if (typeof frontmatter.cssclasses === 'string') {
-            classes.push(...frontmatter.cssclasses.split(/\s+/));
-        } else if (Array.isArray(frontmatter.cssclasses)) {
-            classes.push(...frontmatter.cssclasses);
-        }
-    }
-    
-    return classes.filter(cls => cls.trim().length > 0);
-}
+	private extractCssClasses(frontmatter: any): string[] {
+		const classes: string[] = [];
 
-private checkCssClassChange(file: TFile) {
-    const cache = this.app.metadataCache.getFileCache(file);
-    const newClasses = cache?.frontmatter ? this.extractCssClasses(cache.frontmatter) : [];
-    const oldClasses = this.cssClassCache.get(file.path) || [];
-    
-    // Sort both arrays for comparison
-    const newSorted = [...newClasses].sort();
-    const oldSorted = [...oldClasses].sort();
-    
-    // Check if cssclasses actually changed
-    const hasChanged = newSorted.length !== oldSorted.length || 
-                      !newSorted.every((cls, i) => cls === oldSorted[i]);
-    
-    if (hasChanged) {
-        this.debug(`CSS classes changed for ${file.name}: [${oldClasses.join(', ')}] -> [${newClasses.join(', ')}]`);
-        
-        // Update cache
-        this.cssClassCache.set(file.path, newClasses);
-        
-        // Only refresh if this is the active file
-        const activeFile = this.app.workspace.getActiveFile();
-        if (activeFile && activeFile.path === file.path) {
-            this.refreshPageIfNeeded(file);
-        }
-    } else {
-        this.debug(`CSS classes unchanged for ${file.name}, skipping refresh`);
-    }
-}
+		if (frontmatter?.cssclass) {
+			if (typeof frontmatter.cssclass === 'string') {
+				classes.push(...frontmatter.cssclass.split(/\s+/));
+			} else if (Array.isArray(frontmatter.cssclass)) {
+				classes.push(...frontmatter.cssclass);
+			}
+		}
 
-private refreshPageIfNeeded(file: TFile) {
-    this.debug("CSS classes changed, refreshing page");
-    setTimeout(() => {
-        this.app.workspace.getLeavesOfType("markdown").forEach((e: any) => e.rebuildView());
-    }, 100); // Small delay to ensure frontmatter is fully processed
-}
+		if (frontmatter?.cssclasses) {
+			if (typeof frontmatter.cssclasses === 'string') {
+				classes.push(...frontmatter.cssclasses.split(/\s+/));
+			} else if (Array.isArray(frontmatter.cssclasses)) {
+				classes.push(...frontmatter.cssclasses);
+			}
+		}
+
+		return classes.filter(cls => cls.trim().length > 0);
+	}
+
+	private checkCssClassChange(file: TFile) {
+		const cache = this.app.metadataCache.getFileCache(file);
+		const newClasses = cache?.frontmatter ? this.extractCssClasses(cache.frontmatter) : [];
+		const oldClasses = this.cssClassCache.get(file.path) || [];
+
+		// Sort both arrays for comparison
+		const newSorted = [...newClasses].sort();
+		const oldSorted = [...oldClasses].sort();
+
+		// Check if cssclasses actually changed
+		const hasChanged = newSorted.length !== oldSorted.length ||
+			!newSorted.every((cls, i) => cls === oldSorted[i]);
+
+		if (hasChanged) {
+			this.debug(`CSS classes changed for ${file.name}: [${oldClasses.join(', ')}] -> [${newClasses.join(', ')}]`);
+
+			// Update cache
+			this.cssClassCache.set(file.path, newClasses);
+
+			// Only refresh if this is the active file
+			const activeFile = this.app.workspace.getActiveFile();
+			if (activeFile && activeFile.path === file.path) {
+				this.refreshPageIfNeeded(file);
+			}
+		} else {
+			this.debug(`CSS classes unchanged for ${file.name}, skipping refresh`);
+		}
+	}
+
+	private refreshPageIfNeeded(file: TFile) {
+		this.debug("CSS classes changed, refreshing page");
+		setTimeout(() => {
+			this.app.workspace.getLeavesOfType("markdown").forEach((e: any) => e.rebuildView());
+		}, 100); // Small delay to ensure frontmatter is fully processed
+	}
 
 
 	async postProcessor(el: HTMLElement, ctx: MarkdownPostProcessorContext) {
-    // Check if class filter is enabled
-    if (this.settings.enableClassFilter) {
-        const requiredClass = this.settings.requiredClass || "calccraft";
-        
-        try {
-            let file = null;
-            
-            // For edit mode, we need to get the file from the active view
-            const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-            if (activeView) {
-                file = activeView.file;
-            }
-            
-            // Fallback methods
-            if (!file && ctx.sourcePath) {
-                file = this.app.vault.getAbstractFileByPath(ctx.sourcePath) as TFile;
-            }
-            
-            if (!file) {
-                file = this.app.workspace.getActiveFile();
-            }
-            
-            if (!file) {
-                this.debug("Could not determine current file, processing all tables");
-                // Process anyway if we can't determine the file
-            } else {
-                // Get frontmatter from cache
-                const fileCache = this.app.metadataCache.getFileCache(file);
-                
-                if (fileCache && fileCache.frontmatter) {
-                    const cssclass = fileCache.frontmatter.cssclass;
-                    const cssclasses = fileCache.frontmatter.cssclasses;
-                    
-                    let hasRequiredClass = false;
-                    
-                    // Check cssclass field
-                    if (cssclass) {
-                        if (typeof cssclass === 'string') {
-                            hasRequiredClass = cssclass.split(/\s+/).includes(requiredClass);
-                        } else if (Array.isArray(cssclass)) {
-                            hasRequiredClass = cssclass.includes(requiredClass);
-                        }
-                    }
-                    
-                    // Check cssclasses field if not found yet
-                    if (!hasRequiredClass && cssclasses) {
-                        if (typeof cssclasses === 'string') {
-                            hasRequiredClass = cssclasses.split(/\s+/).includes(requiredClass);
-                        } else if (Array.isArray(cssclasses)) {
-                            hasRequiredClass = cssclasses.includes(requiredClass);
-                        }
-                    }
-                    
-                    this.debug(`File: ${file.name}, Required: ${requiredClass}, Found: ${hasRequiredClass}`);
-					this.debug(`Mode: ${activeView?.getMode()}, cssclass: ${cssclass}, cssclasses: ${cssclasses}`);
+		// Check if class filter is enabled
+		if (this.settings.enableClassFilter) {
+			const requiredClass = this.settings.requiredClass || "calccraft";
 
-                    
-                    if (!hasRequiredClass) {
-                        this.debug(`Skipping page - missing cssclass '${requiredClass}'`);
-                        return;
-                    }
-                } else {
-                    this.debug("No frontmatter found, skipping page");
-                    return;
-                }
-            }
-        } catch (error) {
-            console.error("CalcCraft: Error checking cssclass:", error);
-            // If we can't check the class, process anyway to avoid breaking functionality
-        }
-    }
+			try {
+				let file = null;
 
-    el.querySelectorAll("table").forEach((tableEl, index) => {
-        try {
-            const gridData = this.extractTableGrid(tableEl);
-			this.clearTableHighlights(tableEl);
-            (tableEl as any).CalcCraft = { settings: this.settings };
-            
-            const evaluator = new TableEvaluator();
-            const result = evaluator.evaluateTable(gridData);
-            
-            this.applyResultsToHTML(tableEl, result, gridData, evaluator);
-        } catch (error) {
-            console.error(`CalcCraft: Error processing table ${index}:`, error);
-            tableEl.setAttribute('data-calccraft-error', 'true');
-        }
-    });
-}
+				// For edit mode, we need to get the file from the active view
+				const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+				if (activeView) {
+					file = activeView.file;
+				}
+
+				// Fallback methods
+				if (!file && ctx.sourcePath) {
+					file = this.app.vault.getAbstractFileByPath(ctx.sourcePath) as TFile;
+				}
+
+				if (!file) {
+					file = this.app.workspace.getActiveFile();
+				}
+
+				if (!file) {
+					this.debug("Could not determine current file, processing all tables");
+					// Process anyway if we can't determine the file
+				} else {
+					// Get frontmatter from cache
+					const fileCache = this.app.metadataCache.getFileCache(file);
+
+					if (fileCache && fileCache.frontmatter) {
+						const cssclass = fileCache.frontmatter.cssclass;
+						const cssclasses = fileCache.frontmatter.cssclasses;
+
+						let hasRequiredClass = false;
+
+						// Check cssclass field
+						if (cssclass) {
+							if (typeof cssclass === 'string') {
+								hasRequiredClass = cssclass.split(/\s+/).includes(requiredClass);
+							} else if (Array.isArray(cssclass)) {
+								hasRequiredClass = cssclass.includes(requiredClass);
+							}
+						}
+
+						// Check cssclasses field if not found yet
+						if (!hasRequiredClass && cssclasses) {
+							if (typeof cssclasses === 'string') {
+								hasRequiredClass = cssclasses.split(/\s+/).includes(requiredClass);
+							} else if (Array.isArray(cssclasses)) {
+								hasRequiredClass = cssclasses.includes(requiredClass);
+							}
+						}
+
+						this.debug(`File: ${file.name}, Required: ${requiredClass}, Found: ${hasRequiredClass}`);
+						this.debug(`Mode: ${activeView?.getMode()}, cssclass: ${cssclass}, cssclasses: ${cssclasses}`);
+
+
+						if (!hasRequiredClass) {
+							this.debug(`Skipping page - missing cssclass '${requiredClass}'`);
+							return;
+						}
+					} else {
+						this.debug("No frontmatter found, skipping page");
+						return;
+					}
+				}
+			} catch (error) {
+				console.error("CalcCraft: Error checking cssclass:", error);
+				// If we can't check the class, process anyway to avoid breaking functionality
+			}
+		}
+
+
+		el.querySelectorAll("table").forEach((tableEl, index) => {
+			try {
+				this.removeLabels(tableEl);
+
+				this.clearTableHighlights(tableEl);
+				(tableEl as any).CalcCraft = { settings: this.settings };
+
+				if (this.settings.showLabels) {
+					this.createLabels(tableEl);
+				}
+
+				const gridData = this.extractTableGrid(tableEl);
+				const evaluator = new TableEvaluator();
+				const result = evaluator.evaluateTable(gridData);
+
+				this.applyResultsToHTML(tableEl, result, gridData, evaluator);
+			} catch (error) {
+				console.error(`CalcCraft: Error processing table ${index}:`, error);
+				tableEl.setAttribute('data-calccraft-error', 'true');
+			}
+		});
+	}
 
 
 
@@ -362,84 +372,84 @@ private refreshPageIfNeeded(file: TFile) {
 
 
 
-private formatNumber(num: number): string {
-	if (this.settings.digitGrouping) {
-		const options: Intl.NumberFormatOptions = { useGrouping: true };
-		
-		// Only set precision if it's enabled AND the number actually has decimals that exceed it
-		if (this.settings.precision >= 0) {
+	private formatNumber(num: number): string {
+		if (this.settings.digitGrouping) {
+			const options: Intl.NumberFormatOptions = { useGrouping: true };
+
+			// Only set precision if it's enabled AND the number actually has decimals that exceed it
+			if (this.settings.precision >= 0) {
+				const decimalPart = String(num).split(".")[1];
+				if (decimalPart && decimalPart.length > this.settings.precision) {
+					options.minimumFractionDigits = this.settings.precision;
+					options.maximumFractionDigits = this.settings.precision;
+				}
+			}
+
+			return new Intl.NumberFormat(undefined, options).format(num);
+		} else if (this.settings.precision >= 0) {
 			const decimalPart = String(num).split(".")[1];
 			if (decimalPart && decimalPart.length > this.settings.precision) {
-				options.minimumFractionDigits = this.settings.precision;
-				options.maximumFractionDigits = this.settings.precision;
+				return num.toFixed(this.settings.precision);
 			}
+			return num.toString();
+		} else {
+			return num.toString();
 		}
-		
-		return new Intl.NumberFormat(undefined, options).format(num);
-	} else if (this.settings.precision >= 0) {
-		const decimalPart = String(num).split(".")[1];
-		if (decimalPart && decimalPart.length > this.settings.precision) {
-			return num.toFixed(this.settings.precision);
-		}
-		return num.toString();
-	} else {
-		return num.toString();
 	}
-}
 
-private setFormattedCellValue(cellEl: HTMLElement, value: any, error?: string): void {
-	let data = value;
-	
-	// Handle mathjs Unit objects - check for the presence of unit-specific properties
-	if (typeof data === "object" && data !== null &&
-		(data.constructor?.name === "Unit" ||
-			(data.value !== undefined && data.units !== undefined))) {
-		
-		if (this.settings.precision >= 0 || this.settings.digitGrouping) {
-			// Get the original string representation and extract the number part
-			const unitString = data.toString();
-			const unitMatch = unitString.match(/^(-?\d*\.?\d+)\s*(.*)$/);
-			
+	private setFormattedCellValue(cellEl: HTMLElement, value: any, error?: string): void {
+		let data = value;
+
+		// Handle mathjs Unit objects - check for the presence of unit-specific properties
+		if (typeof data === "object" && data !== null &&
+			(data.constructor?.name === "Unit" ||
+				(data.value !== undefined && data.units !== undefined))) {
+
+			if (this.settings.precision >= 0 || this.settings.digitGrouping) {
+				// Get the original string representation and extract the number part
+				const unitString = data.toString();
+				const unitMatch = unitString.match(/^(-?\d*\.?\d+)\s*(.*)$/);
+
+				if (unitMatch) {
+					const [, numberPart, unitPart] = unitMatch;
+					const num = parseFloat(numberPart);
+					const formattedNumber = this.formatNumber(num);
+					data = `${formattedNumber} ${unitPart}`;
+				} else {
+					data = unitString;
+				}
+			} else {
+				// Convert Unit object to string using its toString method
+				data = data.toString();
+			}
+		} else if (typeof data === "number" && (this.settings.precision >= 0 || this.settings.digitGrouping)) {
+			// Use the helper for numbers
+			data = this.formatNumber(data);
+		} else if (typeof data === "string" && (this.settings.precision >= 0 || this.settings.digitGrouping)) {
+			// Handle unit strings like "24.123456 kg" (fallback for non-mathjs units)
+			const unitMatch = data.match(/^(-?\d*\.?\d+)\s*(.*)$/);
 			if (unitMatch) {
 				const [, numberPart, unitPart] = unitMatch;
 				const num = parseFloat(numberPart);
-				const formattedNumber = this.formatNumber(num);
-				data = `${formattedNumber} ${unitPart}`;
-			} else {
-				data = unitString;
-			}
-		} else {
-			// Convert Unit object to string using its toString method
-			data = data.toString();
-		}
-	} else if (typeof data === "number" && (this.settings.precision >= 0 || this.settings.digitGrouping)) {
-		// Use the helper for numbers
-		data = this.formatNumber(data);
-	} else if (typeof data === "string" && (this.settings.precision >= 0 || this.settings.digitGrouping)) {
-		// Handle unit strings like "24.123456 kg" (fallback for non-mathjs units)
-		const unitMatch = data.match(/^(-?\d*\.?\d+)\s*(.*)$/);
-		if (unitMatch) {
-			const [, numberPart, unitPart] = unitMatch;
-			const num = parseFloat(numberPart);
-			if (!isNaN(num) && isFinite(num)) {
-				const formattedNumber = this.formatNumber(num);
-				data = unitPart ? `${formattedNumber} ${unitPart}` : formattedNumber;
+				if (!isNaN(num) && isFinite(num)) {
+					const formattedNumber = this.formatNumber(num);
+					data = unitPart ? `${formattedNumber} ${unitPart}` : formattedNumber;
+				}
 			}
 		}
+
+		// Live Preview: overlay on the wrapper
+		const wrapper = cellEl.querySelector<HTMLElement>(".table-cell-wrapper");
+		if (wrapper) {
+			const displayValue = error || String(data);
+			wrapper.dataset.calcDisplay = displayValue;
+			wrapper.classList.add("calc-overlay-cell");
+			return;
+		}
+
+		// Reading view: write value directly
+		cellEl.textContent = error || String(data);
 	}
-	
-	// Live Preview: overlay on the wrapper
-	const wrapper = cellEl.querySelector<HTMLElement>(".table-cell-wrapper");
-	if (wrapper) {
-		const displayValue = error || String(data);
-		wrapper.dataset.calcDisplay = displayValue;
-		wrapper.classList.add("calc-overlay-cell");
-		return;
-	}
-	
-	// Reading view: write value directly
-	cellEl.textContent = error || String(data);
-}
 
 
 
@@ -536,16 +546,46 @@ private setFormattedCellValue(cellEl: HTMLElement, value: any, error?: string): 
 	}
 
 	//private recomputeLivePreview = debounce(() => {
+	private scheduleRecompute = (delay = 40) => {
+		// simple debounce so many mutations collapse into one recompute
+		if (this.recomputeTimer) {
+			window.clearTimeout(this.recomputeTimer);
+		}
+		this.recomputeTimer = window.setTimeout(() => {
+			this.recomputeTimer = null;
+			requestAnimationFrame(() => this.recomputeLivePreview());
+		}, delay);
+	};
+
 	private recomputeLivePreview = () => {
+		// don't start a recompute if one is already running
+		if (this.isEvaluating) {
+			this.debug("Recompute already running — skipping.");
+			return;
+		}
+
 		const view = this.app.workspace.getActiveViewOfType(MarkdownView);
 		const root = (view as any)?.editor?.cm?.contentDOM as HTMLElement | undefined;
 		if (!root) return;
 
-		this.debug("Recomputing Live Preview tables");
+		// mark we are running and temporarily suspend reacting to mutations
+		this.isEvaluating = true;
+		this.suspendMutations = true;
 
-		// Reuse your existing processor here:
-		this.postProcessor(root, {} as any);
-	}  
+		try {
+			this.debug("Recomputing Live Preview tables");
+			// perform the work (this.postProcessor mutates DOM)
+			this.postProcessor(root, {} as any);
+		} catch (err) {
+			console.error("CalcCraft: recomputeLivePreview error", err);
+		} finally {
+			// re-enable observing on the next frame so we don't catch our own writes
+			requestAnimationFrame(() => {
+				this.suspendMutations = false;
+				this.isEvaluating = false;
+			});
+		}
+	};
 	//} , 300, true);
 
 	private attachLivePreviewHooks = () => {
@@ -578,19 +618,28 @@ private setFormattedCellValue(cellEl: HTMLElement, value: any, error?: string): 
 
 		// Keep the mutation observer ggbut make it less aggressive
 		const mo = new MutationObserver((mutations) => {
-			// Only recompute if mutations don't involve active editing
+			// if editing inside a table widget, do not recompute
 			const hasActiveEdit = root.querySelector('.cm-table-widget .table-cell-wrapper:focus-within');
-			if (!hasActiveEdit) {
-				this.debug("DOM mutation detected (no active edit)");
-				requestAnimationFrame(this.recomputeLivePreview);
+			if (hasActiveEdit) return;
+
+			// if we ourselves suspended mutations (we're applying programmatic changes), ignore
+			if (this.suspendMutations) {
+				this.debug("Mutation ignored while suspendMutations is true");
+				return;
 			}
+
+			this.debug("DOM mutation detected (no active edit)");
+			// debounce and schedule recompute to collapse many mutations
+			this.scheduleRecompute();
 		});
+		//mo.observe(root, { childList: true, subtree: true, attributes: true, characterData: true });
 		mo.observe(root, { childList: true, subtree: true });
 		this.lpCleanup.push(() => mo.disconnect());
 
 		// Initial pass
 		this.recomputeLivePreview();
 	};
+
 
 	private clearTableHighlights(tableEl: HTMLTableElement) {
 		if (!tableEl) return;
@@ -627,5 +676,89 @@ private setFormattedCellValue(cellEl: HTMLElement, value: any, error?: string): 
 		this.lpCleanup.forEach(fn => fn());
 		this.lpCleanup = [];
 	};
+
+	createLabels(tableEl: HTMLTableElement) {
+
+		// Prevent multiple calls
+		if (tableEl.dataset.labelsAdded === 'true') {
+			return;
+		}
+		this.colOffset = 0;
+		this.rowOffset = 0;
+		tableEl.dataset.labelsAdded = 'true';
+
+		const rows = Array.from(tableEl.querySelectorAll("tr"));
+
+		// Create top row for column labels
+		const newRow = tableEl.insertRow(0);
+		const existingCells = Array.from(rows[0].querySelectorAll("td, th"));
+
+		// For the new top row
+		for (let i = 0; i <= existingCells.length; i++) {
+			const newCell = newRow.insertCell(i);
+			if (i > this.colOffset) {
+				newCell.textContent = String.fromCharCode(
+					"a".charCodeAt(0) + i - 1 - this.colOffset
+				);
+			}
+			newCell.classList.add("label-cell", "column");
+			(newCell as any).CalcCraft = { parents: [], children: [], settings: this.settings };
+		}
+
+		// For the new leftmost column in existing rows (skip the newly created row)
+		rows.forEach((row, index) => {
+			const newCell = row.insertCell(0);
+			if (index + 1 - this.rowOffset > 0) {
+				newCell.textContent = (index + 1 - this.rowOffset).toString();
+			}
+			newCell.classList.add("label-cell", "row");
+			(newCell as any).CalcCraft = { parents: [], children: [], settings: this.settings };
+		});
+
+		// Update offsets so grid extraction skips label cells
+		this.colOffset = 1;
+		this.rowOffset = 1; // Now we skip the top label row too
+	}
+
+	private safelyMutateDOM(fn: () => void) {
+		this.suspendMutations = true;
+		try {
+			fn();
+		} finally {
+			requestAnimationFrame(() => {
+				this.suspendMutations = false;
+			});
+		}
+	}
+
+	removeLabels(tableEl: HTMLTableElement) {
+		this.safelyMutateDOM(() => {
+
+			if (tableEl.dataset.labelsAdded !== 'true') {
+				return;
+			}
+
+			// Remove the top row (column labels)
+			const firstRow = tableEl.rows[0];
+			if (firstRow && firstRow.cells[0]?.classList.contains('label-cell')) {
+				firstRow.remove();
+			}
+
+			// Remove first cell from each remaining row (row labels)
+			Array.from(tableEl.rows).forEach(row => {
+				const firstCell = row.cells[0];
+				if (firstCell?.classList.contains('label-cell')) {
+					firstCell.remove();
+				}
+			});
+
+			delete tableEl.dataset.labelsAdded;
+
+			// Reset offsets
+			this.colOffset = 0;
+			this.rowOffset = 0;
+
+		})
+	}
 
 }

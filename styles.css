@@ -123,7 +123,8 @@ td.label-cell.row {
     color: transparent;
 }
 
-/* Show computed value as overlay */
+
+/* Base overlay - inherits color from parent cell */
 .cm-table-widget .table-cell-wrapper.calc-overlay-cell:not(:focus-within)::after {
     content: attr(data-calc-display);
     position: absolute; 
@@ -131,87 +132,52 @@ td.label-cell.row {
     display: flex; 
     align-items: center; 
     white-space: pre;
-    color: var(--text-normal); 
+    color: inherit; /* ← Changed from var(--text-normal) to inherit */
     pointer-events: none;
-    padding: 0 4px; /* Match table cell padding */
+    padding: 0 4px;
 }
 
-
-
-.table-wrapper table[data-labels-added]{
-    margin-left:1em;
+/* Formula cell overlays - inherit formula colors */
+.cm-table-widget .formula-cell-colorenabled .table-cell-wrapper.calc-overlay-cell:not(:focus-within)::after {
+    color: var(--CalcCraft_formula_font_color_light);
 }
 
-
-/* READING MODE - INLINE LABELS */
-.el-table table[data-labels-added] tbody tr td[data-row-number]::before {
-    content: attr(data-row-number);
-    display: inline-block;
-    color: #888;
-    font-size: 10px;
-    font-weight: normal;
-    width: 12px;
-    text-align: right;
-    margin-right: 6px;
-    background-color: #f5f5f5;
-    border-radius: 2px;
-    padding: 1px 2px;
-    position: static;
+.theme-dark .cm-table-widget .formula-cell-colorenabled .table-cell-wrapper.calc-overlay-cell:not(:focus-within)::after {
+    color: var(--CalcCraft_formula_font_color_dark);
 }
 
-.el-table table[data-labels-added] thead th[data-col-letter]::before {
-    content: attr(data-col-letter);
-    display: inline-block;
-    color: #888;
-    font-size: 10px;
-    font-weight: normal;
-    margin-right: 6px;
-    background-color: #f5f5f5;
-    border-radius: 2px;
-    padding: 1px 2px;
+/* Matrix cell overlays */
+.cm-table-widget .matrix-cell-colorenabled .table-cell-wrapper.calc-overlay-cell:not(:focus-within)::after {
+    color: var(--CalcCraft_formula_font_matrix_light);
 }
 
-/* EDIT MODE - TRY TO MATCH THE READING MODE STYLE */
-.table-wrapper table[data-labels-added] tbody tr td[data-row-number]::before {
-    content: attr(data-row-number);
-    left:-.5em;
-    display: inline-block;
-    color: #888;
-    font-size: 10px;
-    font-weight: normal;
-    width: 12px;
-    text-align: left;
-    border-radius: 2px;
-    padding: 1px 2px;
+.theme-dark .cm-table-widget .matrix-cell-colorenabled .table-cell-wrapper.calc-overlay-cell:not(:focus-within)::after {
+    color: var(--CalcCraft_formula_font_matrix_dark);
 }
 
-.table-wrapper table[data-labels-added] thead th[data-col-letter]::before {
-    content: attr(data-col-letter);
-    display: inline-block;
-    color: #888;
-    font-size: 10px;
-    font-weight: normal;
-    margin-right: 6px;
-    background-color: #f5f5f5;
-    border-radius: 2px;
-    padding: 1px 2px;
- 
-
-
-
-.calc-craft-label {
-    background-color: #f8f9fa !important;
-    color: #6c757d !important;
-    font-size: 10px !important;
-    font-weight: normal !important;
-    text-align: center !important;
-    padding: 2px 4px !important;
-    border: 1px solid #dee2e6 !important;
-    min-width: 20px;
+/* Error cell overlays */
+.cm-table-widget .error-cell-colorenabled .table-cell-wrapper.calc-overlay-cell:not(:focus-within)::after {
+    color: var(--CalcCraft_formula_font_error_light);
 }
 
-.calc-craft-row {
-    text-align: right !important;
-}calc-craft-row {
-    text-align: right !important;
+.theme-dark .cm-table-widget .error-cell-colorenabled .table-cell-wrapper.calc-overlay-cell:not(:focus-within)::after {
+    color: var(--CalcCraft_formula_font_error_dark);
+}
+
+/* Parent highlight overlays */
+.cm-table-widget .cell-parents-highlight .table-cell-wrapper.calc-overlay-cell:not(:focus-within)::after {
+    color: var(--CalcCraft_formula_font_parents_light);
+}
+
+.theme-dark .cm-table-widget .cell-parents-highlight .table-cell-wrapper.calc-overlay-cell:not(:focus-within)::after {
+    color: var(--CalcCraft_formula_font_parents_dark);
+}
+
+/* Children highlight overlays */
+.cm-table-widget .cell-children-highlight .table-cell-wrapper.calc-overlay-cell:not(:focus-within)::after {
+    color: var(--CalcCraft_formula_font_children_light);
+}
+
+.theme-dark .cm-table-widget .cell-children-highlight .table-cell-wrapper.calc-overlay-cell:not(:focus-within)::after {
+    color: var(--CalcCraft_formula_font_children_dark);
 }
