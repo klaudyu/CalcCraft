@@ -28,7 +28,7 @@ Combinations of the two are possible:
 - `=2c7` cell at column 2 (which is b), row 7
 the row-column notation is intended to be used mainly as a relative reference, for example getting the value above the curent cell: `=+0c-1r` (zero columns to the right, the row above)
 
-summing all the values in the curent column from the second row to the cell above the curent one:  `=sum(+0c2:+0c-1r)` 
+summing all the values in the curent column from the second row to the cell above the curent one:  `=sum(+0c1:+0c-1r)` 
 
 #### Highlight involved cells
 The cells that influence the curent cell, are called `parents`, and the ones that depend on the curent cell are called `children`. Hovering the mouse over a cell, shows both the parents and the children, in customizable colors. This makes it easier to track the flow of data in the sheet. The colors can be customized for the dark theme and for the light theme.
