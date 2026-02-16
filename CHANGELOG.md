@@ -39,3 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Display trailing zeros when value exceeds display precision ( e.g. for a precision of 3: 3.00005 -> 3.000 but 3.0000 -> 3)
 - format() takex precedence over the options (e.g. precision is set to 3 in options, but we have =format(1/3,5) -> 0.33333
+
+## [2.3.7] - 2026-02-16
+
+### Added
+- scientific(value, precision) for exponential notation (e.g. 1.23e+9)
+### Fixed
+- sum() now filters empty cells to work with units (e.g. sum(1 cm, 3 cm, empty))
