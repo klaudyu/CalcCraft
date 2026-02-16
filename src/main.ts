@@ -186,9 +186,9 @@ export default class CalcCraftPlugin extends Plugin {
 				this.clearTableHighlights(tableEl);
 				(tableEl as any).CalcCraft = { settings: this.settings };
 
-				if (this.settings.showLabels) {
-					this.createLabels(tableEl);
-				}
+                if (this.settings.showLabels) {
+                    this.addSimpleLabels(tableEl);
+                }
 
 				const gridData = this.extractTableGrid(tableEl);
 				const evaluator = new TableEvaluator();
@@ -251,9 +251,6 @@ export default class CalcCraftPlugin extends Plugin {
 			});
 		});
 
-		if (this.settings.showLabels) {
-			this.addSimpleLabels(tableEl);
-		}
 
 		// Apply computed values and styling
 		for (let rowIndex = 0; rowIndex < this.htmlTable.length; rowIndex++) {
@@ -355,36 +352,37 @@ export default class CalcCraftPlugin extends Plugin {
 
 
 
-	private addSimpleLabels(tableEl: HTMLTableElement): void {
-		// avoid running twice
-		if (tableEl.dataset.labelsAdded === 'true') return;
-		tableEl.dataset.labelsAdded = 'true';
-		const thead = tableEl.tHead;
-		if (thead && thead.rows.length > 0) {
-			const headerRow = thead.rows[0];
-			Array.from(headerRow.cells).forEach((cell, colIndex) => {
-				if (!cell.dataset.colLabeled) {
-					cell.dataset.colLabeled = 'true';
-					cell.dataset.colLetter = String.fromCharCode(97 + colIndex); // 'a' + index
-				}
-			});
-		}
-		const tbody = tableEl.tBodies && tableEl.tBodies[0];
-		if (tbody) {
-			Array.from(tbody.rows).forEach((row, bodyIndex) => {
-				// use the first cell in the row (cells[0]) — won't touch header <th>s
-				const firstCell = row.cells[0];
-				if (firstCell && !firstCell.dataset.rowLabeled) {
-					firstCell.dataset.rowLabeled = 'true';
+    private addSimpleLabels(tableEl: HTMLTableElement): void {
+        // avoid running twice
+        if (tableEl.dataset.labelsAdded === 'true') return;
+        tableEl.dataset.labelsAdded = 'true';
 
-					// compute the printed row number. If there is a THEAD, start from 2
-					// (so tbody row 0 -> table row 2). If no THEAD, start from 1.
-					const printed = thead ? bodyIndex + 2 : bodyIndex + 1;
-					firstCell.dataset.rowNumber = String(printed);
-				}
-			});
-		}
-	}
+        // Label the first row (column headers) - works for both th and td
+        const firstRow = tableEl.rows[0];
+        if (firstRow) {
+            Array.from(firstRow.cells).forEach((cell, colIndex) => {
+                if (!cell.dataset.colLabeled) {
+                    cell.dataset.colLabeled = 'true';
+                    cell.dataset.colLetter = String.fromCharCode(97 + colIndex); // 'a' + index
+                    console.log(`Set column label '${cell.dataset.colLetter}' on cell:`, cell); // DEBUG
+                }
+            });
+        }
+
+        // Label ALL rows (both thead and tbody)
+        const allRows = Array.from(tableEl.rows);
+        allRows.forEach((row, rowIndex) => {
+            const firstCell = row.cells[0];
+            if (firstCell && !firstCell.dataset.rowLabeled) {
+                firstCell.dataset.rowLabeled = 'true';
+                firstCell.dataset.rowNumber = String(rowIndex + 1);
+            }
+        });
+    }
+
+
+
+
 
 
 
