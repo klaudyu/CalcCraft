@@ -181,3 +181,54 @@ td.label-cell.row {
 .theme-dark .cm-table-widget .cell-children-highlight .table-cell-wrapper.calc-overlay-cell:not(:focus-within)::after {
     color: var(--CalcCraft_formula_font_children_dark);
 }
+
+/* Make table cells position relative for absolute positioning of labels */
+table th,
+table td {
+    position: relative;
+}
+
+/* Add padding to table to make room for labels */
+table {
+    margin-left: 25px;
+    margin-top: 20px;
+}
+
+/* Column labels - display above th/td elements */
+th[data-col-letter]::before,
+td[data-col-letter]::before {
+    content: attr(data-col-letter);
+    position: absolute;
+    top: -18px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.75em;
+    color: var(--text-muted);
+    font-weight: normal;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 1;
+}
+
+/* Row labels - display to the left of first cell in each row */
+tr th:first-child[data-row-number]::after,
+tr td:first-child[data-row-number]::after {
+    content: attr(data-row-number);
+    position: absolute;
+    left: -25px;
+    top: 50%;
+    #transform: translateY(-50%);
+    font-size: 0.75em;
+    color: var(--text-muted);
+    font-weight: normal;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+
+
+/* Escaped text cells - look like normal text, not formulas */
+.cm-table-widget .escaped-text-cell .table-cell-wrapper.calc-overlay-cell:not(:focus-within)::after {
+    color: var(--text-normal); /* Normal text color, not formula color */
+}
+ 

@@ -1,4 +1,4 @@
-// At the top of main.ts, add TFile to imports:
+
 import { Plugin, MarkdownPostProcessorContext, App, MarkdownView, debounce, TFile } from "obsidian";
 import { CalcCraftSettingsTab, DefaultSettings } from "./settings";
 import { TableEvaluator } from "./table-evaluator";
@@ -204,37 +204,28 @@ export default class CalcCraftPlugin extends Plugin {
 
 
 
-	private extractTableGrid(tableEl: HTMLTableElement): string[][] {
-		const rows = Array.from(tableEl.querySelectorAll("tr"));
-		if (rows.length === 0) return [];
+    private extractTableGrid(tableEl: HTMLTableElement): string[][] {
+        const rows = Array.from(tableEl.querySelectorAll("tr"));
+        if (rows.length === 0) return [];
+        
+        const validRows = rows.slice(this.rowOffset);
+        if (validRows.length === 0) return [];
+        
+        const gridData: string[][] = [];
+        validRows.forEach((rowEl, i) => {
+            const cells = Array.from(rowEl.querySelectorAll("td, th"));
+            const validCells = cells.slice(this.colOffset);
+            gridData[i] = [];
+            validCells.forEach((cellEl, j) => {
+                const wrapper = cellEl.querySelector(".table-cell-wrapper");
+                let cellContent = wrapper ? wrapper.textContent : cellEl.textContent;
+                gridData[i][j] = (cellContent || "").trim(); // Add null coalescing operator
+            });
+        });
+        return gridData;
+    }
 
-		const validRows = rows.slice(this.rowOffset);
-		if (validRows.length === 0) return [];
 
-		const gridData: string[][] = [];
-
-		validRows.forEach((rowEl, i) => {
-			const cells = Array.from(rowEl.querySelectorAll("td, th"));
-			const validCells = cells.slice(this.colOffset);
-			gridData[i] = [];
-
-			validCells.forEach((cellEl, j) => {
-				const wrapper = cellEl.querySelector(".table-cell-wrapper");
-                let cellContent = "";
-                if (wrapper?.dataset.originalContent) {
-                    cellContent = wrapper.dataset.originalContent; // Get the '= version
-                } else if (wrapper) {
-                    cellContent = wrapper.textContent;
-                } else {
-                    cellContent = cellEl.textContent;
-                }
-
-				gridData[i][j] = cellContent.trim();
-			});
-		});
-
-		return gridData;
-	}
 
 
 
@@ -288,7 +279,7 @@ export default class CalcCraftPlugin extends Plugin {
 
 				// Get parents from evaluator and convert to HTML elements
 				const parentCoords = evaluator.parents[rowIndex][colIndex];
-                parentCoords.forEach(([parentRow, parentCol]: [number, number]) => {  // ← Add type
+                parentCoords.forEach(([parentRow, parentCol]: [number, number]) => {  
 					if (this.htmlTable[parentRow] && this.htmlTable[parentRow][parentCol]) {
 						(cellEl as any).CalcCraft.parents.push(this.htmlTable[parentRow][parentCol]);
 					}
@@ -296,7 +287,7 @@ export default class CalcCraftPlugin extends Plugin {
 
 				// Get children from evaluator and convert to HTML elements  
 				const childrenCoords = evaluator.children[rowIndex][colIndex];
-                childrenCoords.forEach(([childRow, childCol]: [number, number]) => {  // ← Add type
+                childrenCoords.forEach(([childRow, childCol]: [number, number]) => {  
 					if (this.htmlTable[childRow] && this.htmlTable[childRow][childCol]) {
 						(cellEl as any).CalcCraft.children.push(this.htmlTable[childRow][childCol]);
 					}
@@ -333,17 +324,21 @@ export default class CalcCraftPlugin extends Plugin {
 					}
 					this.setFormattedCellValue(cellEl, computedValue);
 				} else if (cellType === 4) { // escaped_text
+                    cellEl.classList.add("escaped-text-cell"); 
+                    
                     const wrapper = cellEl.querySelector<HTMLElement>(".table-cell-wrapper");
                     if (wrapper) {
-                        // Store original in data attribute for editing
-                        wrapper.dataset.originalContent = cellContent; // This has '=
-                        // Display without the apostrophe
-                        wrapper.textContent = String(computedValue); // This has ' removed
+                        // Don't modify textContent - keep '=value
+                        wrapper.dataset.calcDisplay = String(computedValue); // =value (without ')
+                        wrapper.classList.add("calc-overlay-cell");
+                        cellEl.setAttribute("title", cellContent); // Shows '=value
                     } else {
                         // Reading view
                         cellEl.textContent = String(computedValue);
                     }
                 }
+
+
 			}
 		}
  
@@ -523,7 +518,7 @@ export default class CalcCraftPlugin extends Plugin {
 
 	}
 
-	// ADD event listeners method:
+	
 	private addTableEventListeners(tableEl: HTMLTableElement): void {
 
 		// Attach a single 'mouseover' event listener to the table

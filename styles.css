@@ -226,3 +226,9 @@ tr td:first-child[data-row-number]::after {
 }
 
 
+
+/* Escaped text cells - look like normal text, not formulas */
+.cm-table-widget .escaped-text-cell .table-cell-wrapper.calc-overlay-cell:not(:focus-within)::after {
+    color: var(--text-normal); /* Normal text color, not formula color */
+}
+ 
