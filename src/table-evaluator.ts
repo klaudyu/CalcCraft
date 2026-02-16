@@ -1,7 +1,42 @@
 // table-evaluator.ts
-import { evaluate } from "mathjs";
+// At the top with imports
 
-const debug = false;
+const debug=false;
+
+import { create, all } from 'mathjs';
+
+const math = create(all);
+
+// In table-evaluator.ts
+math.import({
+    format: function(value: any, precision: number) {
+        if (typeof value === 'number') {
+            if (precision >= 0) {
+                let formatted = value.toFixed(precision);
+                
+                // Check if after removing trailing zeros, we'd lose all decimals
+                const withoutZeros = formatted.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+                
+                // If result is "0" but original number wasn't zero, keep the zeros to show scale
+                if (withoutZeros === '0' && value !== 0) {
+                    return formatted; // Keep "0.00000" to show it's very small
+                }
+                
+                // Remove trailing zeros for normal cases
+                return withoutZeros;
+            }
+            return value.toString();
+        }
+        return String(value);
+    }
+}, { override: true });
+
+
+
+
+
+
+
 
 enum celltype {
     number = 1,
@@ -258,6 +293,18 @@ export class TableEvaluator {
     }
 
 
+    private applyCustomFormat(value: any, precision: number): string {
+        if (typeof value === 'number') {
+            if (precision >= 0) {
+                const fixed = value.toFixed(precision);
+                // Remove trailing zeros
+                return fixed.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+            }
+            return value.toString();
+        }
+        return String(value);
+    }
+
 
     getValueByCoordinates(row: number, col: number) {
         const r = this.cords2ref(row, col);
@@ -323,7 +370,15 @@ export class TableEvaluator {
 
 try {
     this.debug(`we will evaluate the formula: ${processedformula}`);
-    const result = evaluate(processedformula);
+    const result = math.evaluate(processedformula);
+    
+    if (result && typeof result === 'object' && result._isFormatted) {
+        const formatted = this.applyCustomFormat(result.value, result.precision);
+        this.cellstatus[row][col] = cellstatus.iscomputed;
+        this.tableData[row][col] = formatted;
+        return formatted;
+    }
+    
     this.debug(
         `we were asked to fill in at ${this.cords2ref(
             row,
@@ -612,14 +667,14 @@ try {
                     this.debug(`we matched a column range`);
                     i += matchRangeCol[0].length - 1;
                     const [start, end] = matchRangeCol[0].split(":"); // Split the range into start and end
-                    const [startCol, startRow] = [this.letter2col(start), 0];
+                    const [startCol, startRow] = [this.letter2col(start), 1]; // we skip the first row
                     const [endCol, endRow] = [this.letter2col(end), this.maxrows - 1];
                     results += this.unfoldRange(startRow, endRow, startCol, endCol, pos);
                 } else if (matchRangeColMatrix) {
                     this.debug(`we matched a column range Matrix`);
                     i += matchRangeColMatrix[0].length - 1;
                     const [start, end] = matchRangeColMatrix[0].slice(1, -1).split(":"); // Split the range into start and end
-                    const [startCol, startRow] = [this.letter2col(start), 0];
+                    const [startCol, startRow] = [this.letter2col(start), 1];  // we skip the first row
                     const [endCol, endRow] = [this.letter2col(end), this.maxrows - 1];
                     results += this.unfoldRange(startRow, endRow, startCol, endCol, pos, true);
                 } else if (matchRangeRow) {

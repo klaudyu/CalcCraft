@@ -212,18 +212,29 @@ export default class CalcCraftPlugin extends Plugin {
         if (validRows.length === 0) return [];
         
         const gridData: string[][] = [];
+        
         validRows.forEach((rowEl, i) => {
             const cells = Array.from(rowEl.querySelectorAll("td, th"));
             const validCells = cells.slice(this.colOffset);
             gridData[i] = [];
+            
             validCells.forEach((cellEl, j) => {
-                const wrapper = cellEl.querySelector(".table-cell-wrapper");
+                const wrapper = cellEl.querySelector('.table-cell-wrapper');
                 let cellContent = wrapper ? wrapper.textContent : cellEl.textContent;
-                gridData[i][j] = (cellContent || "").trim(); // Add null coalescing operator
+                cellContent = (cellContent || "").trim();
+                
+                // DEBUG: Log what we're extracting
+                if (cellContent.startsWith('=') || cellContent.startsWith("'=")) {
+                    console.log(`Extracting cell [${i},${j}]:`, cellContent);
+                }
+                
+                gridData[i][j] = cellContent;
             });
         });
+        
         return gridData;
     }
+
 
 
 
@@ -379,118 +390,93 @@ export default class CalcCraftPlugin extends Plugin {
 
 
 
-
-
-    private formatNumber(num: number): string {
-      let result: string;
-      
-      if (this.settings.digitGrouping) {
-        const options: Intl.NumberFormatOptions = { useGrouping: true };
+private formatNumber(num: number): string {
+    let result: string;
+    
+    // Apply global precision
+    if (this.settings.precision >= 0) {
+        result = num.toFixed(this.settings.precision);
         
-        if (this.settings.precision >= 0) {
-          const decimalPart = String(num).split(".")[1];
-          if (decimalPart && decimalPart.length > this.settings.precision) {
-            options.minimumFractionDigits = this.settings.precision;
-            options.maximumFractionDigits = this.settings.precision;
-          }
-        }
+        // Check if after removing trailing zeros, we'd get just "0"
+        const withoutZeros = result.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
         
-        // Format with default separators first
-        result = new Intl.NumberFormat(undefined, options).format(num);
-      } else if (this.settings.precision >= 0) {
-        const decimalPart = String(num).split(".")[1];
-        if (decimalPart && decimalPart.length > this.settings.precision) {
-          result = num.toFixed(this.settings.precision);
+        // If result would be "0" but original number wasn't zero, keep zeros to show scale
+        if (withoutZeros === '0' && num !== 0) {
+            // Keep the zeros: "0.000"
+            result = result;
         } else {
-          result = num.toString();
+            // Remove trailing zeros for normal cases
+            result = withoutZeros;
         }
-      } else {
+    } else {
         result = num.toString();
-      }
-      
-      // Apply custom separators
-      const defaultDecimal = ".";
-      const defaultGrouping = ",";
-      const targetDecimal = this.settings.decimalSeparator || ".";
-      const targetGrouping = this.settings.groupingSeparator || ",";
-      
-      // Only replace if different from defaults
-      if (targetDecimal !== defaultDecimal || targetGrouping !== defaultGrouping) {
-        // Replace decimal separator (must do this first before touching grouping)
-        result = result.replace(defaultDecimal, "<<<DECIMAL>>>");
-        // Replace grouping separator
-        result = result.replace(new RegExp('\\' + defaultGrouping, 'g'), targetGrouping);
-        // Replace temporary decimal placeholder
-        result = result.replace("<<<DECIMAL>>>", targetDecimal);
-      }
-      
-      return result;
     }
+    
+    return this.applySeparators(result);
+}
 
 
-    private parseLocaleNumber(str: string): number {
-      const decimal = this.settings.decimalSeparator || ".";
-      const grouping = this.settings.groupingSeparator || ",";
-      
-      const normalized = String(str)
-        .replace(new RegExp('\\' + grouping.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '')
-        .replace(decimal, '.');
-      
-      return parseFloat(normalized);
+private applySeparators(numString: string): string {
+    const parts = numString.split('.');
+    let integerPart = parts[0];
+    const decimalPart = parts[1];
+    
+    if (this.settings.digitGrouping) {
+        integerPart = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, this.settings.groupingSeparator || ',');
     }
+    
+    const result = decimalPart !== undefined 
+        ? integerPart + (this.settings.decimalSeparator || '.') + decimalPart
+        : integerPart;
+    
+    return result;
+}
 
-	private setFormattedCellValue(cellEl: HTMLElement, value: any, error?: string): void {
-		let data = value;
+private setFormattedCellValue(cellEl: HTMLElement, value: any, error?: string): void {
+    let data = value;
+    
+    // Handle mathjs Unit objects
+    if (typeof data === "object" && data !== null &&
+        (data.constructor?.name === "Unit" ||
+        (data.value !== undefined && data.units !== undefined))) {
+        const unitString = data.toString();
+        const unitMatch = unitString.match(/^(-?[\d\.]+)\s*(.*)$/);
+        if (unitMatch) {
+            const [, numberPart, unitPart] = unitMatch;
+            const formatted = this.applySeparators(numberPart);
+            data = `${formatted} ${unitPart}`;
+        } else {
+            data = unitString;
+        }
+    } 
+    // Handle numbers (NOT pre-formatted)
+    else if (typeof data === "number") {
+        data = this.formatNumber(data); // Applies global precision + separators
+    } 
+    // Handle strings (from format() - already has precision applied)
+    else if (typeof data === "string") {
+        const numMatch = data.match(/^(-?\d*\.?\d+)$/);
+        if (numMatch) {
+            // String number from format() - ONLY apply separators, NO precision change
+            data = this.applySeparators(data);
+        } else {
+            const unitMatch = data.match(/^(-?\d*\.?\d+)\s*(.+)$/);
+            if (unitMatch) {
+                const [, numberPart, unitPart] = unitMatch;
+                data = this.applySeparators(numberPart) + ' ' + unitPart;
+            }
+        }
+    }
+    
+    const wrapper = cellEl.querySelector<HTMLElement>('.table-cell-wrapper');
+    if (wrapper) {
+        wrapper.dataset.calcDisplay = error || String(data);
+        wrapper.classList.add('calc-overlay-cell');
+        return;
+    }
+    cellEl.textContent = error || String(data);
+}
 
-		// Handle mathjs Unit objects - check for the presence of unit-specific properties
-		if (typeof data === "object" && data !== null &&
-			(data.constructor?.name === "Unit" ||
-				(data.value !== undefined && data.units !== undefined))) {
-
-			if (this.settings.precision >= 0 || this.settings.digitGrouping) {
-				// Get the original string representation and extract the number part
-				const unitString = data.toString();
-                const unitMatch = unitString.match(/^(-?[\d,\.\s]+)\s*(.*)$/);
-                if (unitMatch) {
-                    const [, numberPart, unitPart] = unitMatch;
-                    const num = this.parseLocaleNumber(numberPart); // ← Changed
-                    const formattedNumber = this.formatNumber(num);
-					data = `${formattedNumber} ${unitPart}`;
-				} else {
-					data = unitString;
-				}
-			} else {
-				// Convert Unit object to string using its toString method
-				data = data.toString();
-			}
-		} else if (typeof data === "number" && (this.settings.precision >= 0 || this.settings.digitGrouping)) {
-			// Use the helper for numbers
-			data = this.formatNumber(data);
-		} else if (typeof data === "string" && (this.settings.precision >= 0 || this.settings.digitGrouping)) {
-			// Handle unit strings like "24.123456 kg" (fallback for non-mathjs units)
-			const unitMatch = data.match(/^(-?\d*\.?\d+)\s*(.*)$/);
-			if (unitMatch) {
-				const [, numberPart, unitPart] = unitMatch;
-				const num = parseFloat(numberPart);
-				if (!isNaN(num) && isFinite(num)) {
-					const formattedNumber = this.formatNumber(num);
-					data = unitPart ? `${formattedNumber} ${unitPart}` : formattedNumber;
-				}
-			}
-		}
-
-		// Live Preview: overlay on the wrapper
-		const wrapper = cellEl.querySelector<HTMLElement>(".table-cell-wrapper");
-		if (wrapper) {
-			const displayValue = error || String(data);
-			wrapper.dataset.calcDisplay = displayValue;
-			wrapper.classList.add("calc-overlay-cell");
-			return;
-		}
-
-		// Reading view: write value directly
-		cellEl.textContent = error || String(data);
-	}
 
 
 
