@@ -119,23 +119,25 @@ td.label-cell.row {
 
 /* Hide original text when showing computed value */
 .cm-table-widget .table-cell-wrapper.calc-overlay-cell:not(:focus-within) {
-    position: relative; 
-    color: transparent;
+    position: relative;
+    font-size: 0; /* Collapse the text so it doesn't affect layout */
+    line-height: 0;
 }
 
 
 /* Base overlay - inherits color from parent cell */
 .cm-table-widget .table-cell-wrapper.calc-overlay-cell:not(:focus-within)::after {
-    content: attr(data-calc-display);
-    position: absolute; 
-    inset: 0;
-    display: flex; 
-    align-items: center; 
-    white-space: pre;
-    color: inherit; /* ← Changed from var(--text-normal) to inherit */
-    pointer-events: none;
-    padding: 0 4px;
+content: attr(data-calc-display);
+position: relative; /* Changed from absolute */
+display: inline-block; /* Changed to allow sizing */
+white-space: pre;
+color: inherit;
+font-size: 1rem; /* Restore normal font size */
+line-height: normal; /* Restore normal line height */
+padding: 0 4px;
+vertical-align: middle;
 }
+
 
 /* Formula cell overlays - inherit formula colors */
 .cm-table-widget .formula-cell-colorenabled .table-cell-wrapper.calc-overlay-cell:not(:focus-within)::after {

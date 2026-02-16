@@ -24,3 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Label Display**: Refactored table labels to use CSS pseudo-elements instead of adding physical rows and columns to the DOM
     - Labels now displayed via `::before` and `::after` CSS pseudo-elements to avoid row/column switch when selecting a row or a column
 - **BUG fix**: removing the "'" from the beginning of formula was not returning the cell to a formula
+
+
+## [2.3.4] - 2026-02-16
+
+### Fixed
+- **Cell sizing in Live Preview**: Cells to adapt their size to the computed value display instead of the underlying formula text. Fixes issue where long formulas like =2^64 that would not fit in the cell, or long formulas that compute to short values unnecessarily wide when the result was just "42".
