@@ -6,7 +6,8 @@ const debug = false;
 enum celltype {
     number = 1,
     formula,
-    matrix
+    matrix,
+    escaped_text
 }
 enum cellstatus {
     none = 1,
@@ -116,7 +117,13 @@ export class TableEvaluator {
             for (let colIndex = 0; colIndex < this.maxcols; colIndex++) {
                 const cellContent = gridData[rowIndex]?.[colIndex] || "";
 
-                if (cellContent.startsWith("=")) {
+                if (cellContent.startsWith("'=")) {
+                    // Store the content WITHOUT the apostrophe for display
+                    this.formulaData[rowIndex][colIndex] = null;
+                    this.cellstatus[rowIndex][colIndex] = cellstatus.iscomputed;
+                    this.celltype[rowIndex][colIndex] = celltype.escaped_text;
+                    this.tableData[rowIndex][colIndex] = cellContent.substring(1); // Remove '
+                } else if (cellContent.startsWith("=")) {
                     // Formula cell
                     this.formulaData[rowIndex][colIndex] = cellContent;
                     this.cellstatus[rowIndex][colIndex] = cellstatus.none;

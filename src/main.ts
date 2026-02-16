@@ -219,10 +219,15 @@ export default class CalcCraftPlugin extends Plugin {
 			gridData[i] = [];
 
 			validCells.forEach((cellEl, j) => {
-				const wrapper = cellEl.querySelector('.table-cell-wrapper');
-				let cellContent = wrapper ?
-					(wrapper.textContent || "") :
-					(cellEl.textContent || "");
+				const wrapper = cellEl.querySelector(".table-cell-wrapper");
+                let cellContent = "";
+                if (wrapper?.dataset.originalContent) {
+                    cellContent = wrapper.dataset.originalContent; // Get the '= version
+                } else if (wrapper) {
+                    cellContent = wrapper.textContent;
+                } else {
+                    cellContent = cellEl.textContent;
+                }
 
 				gridData[i][j] = cellContent.trim();
 			});
@@ -330,10 +335,21 @@ export default class CalcCraftPlugin extends Plugin {
 						cellEl.classList.add("matrix-cell-colorenabled");
 					}
 					this.setFormattedCellValue(cellEl, computedValue);
-				}
+				} else if (cellType === 4) { // escaped_text
+                    const wrapper = cellEl.querySelector<HTMLElement>(".table-cell-wrapper");
+                    if (wrapper) {
+                        // Store original in data attribute for editing
+                        wrapper.dataset.originalContent = cellContent; // This has '=
+                        // Display without the apostrophe
+                        wrapper.textContent = String(computedValue); // This has ' removed
+                    } else {
+                        // Reading view
+                        cellEl.textContent = String(computedValue);
+                    }
+                }
 			}
 		}
-
+ 
 		this.addTableEventListeners(tableEl);
 	}
 
