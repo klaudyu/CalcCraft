@@ -7,31 +7,68 @@ import { create, all } from 'mathjs';
 
 const math = create(all);
 
-
+// Custom sum function that handles units and skips zeros
 math.import({
     format: function(value: any, precision: number) {
         if (typeof value === 'number') {
             if (precision >= 0) {
-                const formatted = value.toFixed(precision);
+                // Cap precision at 15 (realistic for JavaScript doubles)
+                const cappedPrecision = Math.min(precision, 15);
+                const formatted = value.toFixed(cappedPrecision);
                 
-                // Check if the original number has more precision than what we're showing
-                // by comparing the rounded value with the original
                 const rounded = parseFloat(formatted);
                 const hasMorePrecision = rounded !== value;
                 
                 if (hasMorePrecision) {
-                    // Number was truncated/rounded, keep all zeros to show precision limit
-                    return formatted; // e.g., "3.000" for 3.0002342
+                    return formatted;
                 } else {
-                    // Number is exact at this precision, remove trailing zeros
                     return formatted.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
                 }
             }
             return value.toString();
         }
         return String(value);
+    },
+        scientific: function(value: any, precision: number = 2) {
+        if (typeof value === 'number') {
+            // Use toExponential for scientific notation
+            const formatted = value.toExponential(precision);
+            
+            // Optionally remove trailing zeros
+            return formatted.replace(/(\.\d*?)0+(e[+-]?\d+)$/, '$1$2').replace(/\.(e[+-]?\d+)$/, '$1');
+        }
+        return String(value);
+    },
+    sum: function(...args: any[]) {
+        // Flatten arguments
+        const flattened = args.flat(Infinity);
+        
+        // Filter out null, undefined, and zero (from empty cells)
+        const filtered = flattened.filter((v: any) => {
+            if (v === null || v === undefined) return false;
+            if (v === 0) return false; // Skip zero from empty cells
+            return true;
+        });
+        
+        // If nothing left, return 0
+        if (filtered.length === 0) return 0;
+        
+        // Build an add expression and evaluate it
+        // This lets mathjs handle units naturally
+        const expression = filtered.join(' + ');
+        try {
+            return math.evaluate(expression);
+        } catch (e) {
+            // Fallback to regular sum if evaluation fails
+            return filtered.reduce((sum: number, val: any) => {
+                const num = typeof val === 'number' ? val : parseFloat(val);
+                return sum + (isNaN(num) ? 0 : num);
+            }, 0);
+        }
     }
 }, { override: true });
+
+const evaluate = math.evaluate;
 
 enum celltype {
     number = 1,

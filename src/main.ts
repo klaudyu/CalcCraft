@@ -225,7 +225,7 @@ export default class CalcCraftPlugin extends Plugin {
                 
                 // DEBUG: Log what we're extracting
                 if (cellContent.startsWith('=') || cellContent.startsWith("'=")) {
-                    console.log(`Extracting cell [${i},${j}]:`, cellContent);
+                    this.debug(`Extracting cell [${i},${j}]:`, cellContent);
                 }
                 
                 gridData[i][j] = cellContent;
