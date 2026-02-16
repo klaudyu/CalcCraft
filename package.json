@@ -1,6 +1,6 @@
 {
 	"name": "CalcCraft-plugin",
-	"version": "2.3.0",
+	"version": "2.3.1",
 	"description": "this is an excel like plugin Obsidian (https://obsidian.md)",
 	"main": "main.js",
 	"scripts": {
