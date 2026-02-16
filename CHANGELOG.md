@@ -30,3 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Cell sizing in Live Preview**: Cells to adapt their size to the computed value display instead of the underlying formula text. Fixes issue where long formulas like =2^64 that would not fit in the cell, or long formulas that compute to short values unnecessarily wide when the result was just "42".
+
+## [2.3.5] - 2026-02-16
+- isNumeric() fixed
