@@ -1,7 +1,7 @@
 {
 	"id": "calc-craft",
 	"name": "CalcCraft",
-	"version": "2.3.6",
+	"version": "2.3.7",
 	"minAppVersion": "0.15.0",
 	"description": "have formulas like in excel a1+a2, or sum()",
 	"author": "klaudyu",
