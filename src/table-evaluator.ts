@@ -236,26 +236,27 @@ export class TableEvaluator {
 
     private parseUnitValue(cellContent: string): { value: number; unit: string | null } {
       if (typeof cellContent !== 'string') {
-        return { value: this.parseLocaleNumber(cellContent), unit: null }; // ← Changed
+        return { value: this.parseLocaleNumber(cellContent), unit: null };
       }
-      
+
       const unitMatch = cellContent.trim().match(/^(-?[\d,\.\s]+)\s*([a-zA-Z]+.*)?$/);
       if (unitMatch) {
         const [, numberPart, unitPart] = unitMatch;
-        const value = this.parseLocaleNumber(numberPart); // ← Changed
+        const value = this.parseLocaleNumber(numberPart);
         if (!isNaN(value) && isFinite(value)) {
           return { value, unit: unitPart ? unitPart.trim() : null };
         }
       }
-      
+
       // Try to parse as plain number
-      const numValue = this.parseLocaleNumber(cellContent); // ← Changed
+      const numValue = this.parseLocaleNumber(cellContent);
       if (!isNaN(numValue) && isFinite(numValue)) {
         return { value: numValue, unit: null };
       }
-      
-      return { value: 0, unit: null };
+
+      return { value: NaN, unit: null };  
     }
+
 
 
     getValueByCoordinates(row: number, col: number) {
@@ -276,7 +277,7 @@ export class TableEvaluator {
                     return `${parsed.value} ${parsed.unit}`;
                 }
                 // Check if it's a number string
-                const parsedNum = this.parseLocaleNumber(val); // ← Changed
+                const parsedNum = this.parseLocaleNumber(val);
                 if (!isNaN(parsedNum) && isFinite(parsedNum)) {
                     return parsedNum;
                 }
@@ -611,14 +612,14 @@ try {
                     this.debug(`we matched a column range`);
                     i += matchRangeCol[0].length - 1;
                     const [start, end] = matchRangeCol[0].split(":"); // Split the range into start and end
-                    const [startCol, startRow] = [this.letter2col(start), 1];
+                    const [startCol, startRow] = [this.letter2col(start), 0];
                     const [endCol, endRow] = [this.letter2col(end), this.maxrows - 1];
                     results += this.unfoldRange(startRow, endRow, startCol, endCol, pos);
                 } else if (matchRangeColMatrix) {
                     this.debug(`we matched a column range Matrix`);
                     i += matchRangeColMatrix[0].length - 1;
                     const [start, end] = matchRangeColMatrix[0].slice(1, -1).split(":"); // Split the range into start and end
-                    const [startCol, startRow] = [this.letter2col(start), 1];
+                    const [startCol, startRow] = [this.letter2col(start), 0];
                     const [endCol, endRow] = [this.letter2col(end), this.maxrows - 1];
                     results += this.unfoldRange(startRow, endRow, startCol, endCol, pos, true);
                 } else if (matchRangeRow) {

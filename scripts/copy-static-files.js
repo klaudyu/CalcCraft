@@ -13,7 +13,7 @@ if (!existsSync(distDir)) {
   console.log('Directory dist already exists');
 }
 
-copyFileSync('styles.css', 'dist/styles.css');
+//copyFileSync('styles.css', 'dist/styles.css');
 
 filesToCopy.forEach(file => {
   copyFileSync(file, `${distDir}/${file}`);
