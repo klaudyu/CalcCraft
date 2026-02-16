@@ -29,7 +29,16 @@ export interface TableResult {
 }
 
 export class TableEvaluator {
-    // Add settings parameter
+    tableData: any[][] = [];
+    formulaData: any[][] = [];
+    celltype: celltype[][] = [];
+    cellstatus: cellstatus[][] = [];
+    errors: (string | null)[][] = [];
+    parents: [number, number][][][] = [];
+    children: [number, number][][][] = [];
+    maxcols: number = 0;
+    maxrows: number = 0;
+    useBool = false;
     settings: any;
 
     private parseLocaleNumber(str: string): number {

@@ -286,7 +286,7 @@ export default class CalcCraftPlugin extends Plugin {
 
 				// Get parents from evaluator and convert to HTML elements
 				const parentCoords = evaluator.parents[rowIndex][colIndex];
-				parentCoords.forEach(([parentRow, parentCol]) => {
+                parentCoords.forEach(([parentRow, parentCol]: [number, number]) => {  // ← Add type
 					if (this.htmlTable[parentRow] && this.htmlTable[parentRow][parentCol]) {
 						(cellEl as any).CalcCraft.parents.push(this.htmlTable[parentRow][parentCol]);
 					}
@@ -294,7 +294,7 @@ export default class CalcCraftPlugin extends Plugin {
 
 				// Get children from evaluator and convert to HTML elements  
 				const childrenCoords = evaluator.children[rowIndex][colIndex];
-				childrenCoords.forEach(([childRow, childCol]) => {
+                childrenCoords.forEach(([childRow, childCol]: [number, number]) => {  // ← Add type
 					if (this.htmlTable[childRow] && this.htmlTable[childRow][childCol]) {
 						(cellEl as any).CalcCraft.children.push(this.htmlTable[childRow][childCol]);
 					}
