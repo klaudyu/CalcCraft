@@ -29,21 +29,32 @@ export interface TableResult {
 }
 
 export class TableEvaluator {
-    tableData: any[][] = [];
-    formulaData: any[][] = [];
-    celltype: celltype[][] = [];
-    cellstatus: cellstatus[][] = [];
-    errors: (string | null)[][] = [];
-    parents: [number, number][][][] = [];
-    children: [number, number][][][] = [];
-    maxcols: number = 0;
-    maxrows: number = 0;
-    useBool = false;
+    // Add settings parameter
+    settings: any;
 
-    evaluateTable(gridData: string[][]): TableResult {
-        // Reset all arrays
-        this.tableData = [];
-        this.formulaData = [];
+    private parseLocaleNumber(str: string): number {
+    const decimal = this.settings.decimalSeparator || ".";
+    const grouping = this.settings.groupingSeparator || ",";
+
+    // Remove grouping separators, replace decimal with dot for parseFloat
+    const normalized = String(str)
+      .replace(new RegExp('\\' + grouping.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '')
+      .replace(decimal, '.');
+
+    return parseFloat(normalized);
+    }
+
+
+    evaluateTable(gridData: string[][], settings?: any): TableResult {
+      // Set settings with defaults
+      this.settings = settings || { 
+        decimalSeparator: ".", 
+        groupingSeparator: "," 
+      };
+      
+      // Reset all arrays
+      this.tableData = [];
+      this.formulaData = [];
         this.celltype = [];
         this.cellstatus = [];
         this.errors = [];
@@ -143,6 +154,10 @@ export class TableEvaluator {
         }
     }
 
+
+
+
+
     bool2nr(value: any): any {
         return typeof value === "boolean" ? +value : value;
     }
@@ -204,33 +219,28 @@ export class TableEvaluator {
 
 
     private parseUnitValue(cellContent: string): { value: number; unit: string | null } {
-        if (typeof cellContent !== 'string') {
-            return { value: parseFloat(cellContent), unit: null };
+      if (typeof cellContent !== 'string') {
+        return { value: this.parseLocaleNumber(cellContent), unit: null }; // ← Changed
+      }
+      
+      const unitMatch = cellContent.trim().match(/^(-?[\d,\.\s]+)\s*([a-zA-Z]+.*)?$/);
+      if (unitMatch) {
+        const [, numberPart, unitPart] = unitMatch;
+        const value = this.parseLocaleNumber(numberPart); // ← Changed
+        if (!isNaN(value) && isFinite(value)) {
+          return { value, unit: unitPart ? unitPart.trim() : null };
         }
-
-        // Match patterns like "5 kg", "10.5m", "3.14 meters", etc.
-        const unitMatch = cellContent.trim().match(/^(-?\d*\.?\d+)\s*([a-zA-Z]+.*)?$/);
-
-        if (unitMatch) {
-            const [, numberPart, unitPart] = unitMatch;
-            const value = parseFloat(numberPart);
-
-            if (!isNaN(value) && isFinite(value)) {
-                return {
-                    value,
-                    unit: unitPart ? unitPart.trim() : null
-                };
-            }
-        }
-
-        // Try to parse as plain number
-        const numValue = parseFloat(cellContent);
-        if (!isNaN(numValue) && isFinite(numValue)) {
-            return { value: numValue, unit: null };
-        }
-
-        return { value: 0, unit: null };
+      }
+      
+      // Try to parse as plain number
+      const numValue = this.parseLocaleNumber(cellContent); // ← Changed
+      if (!isNaN(numValue) && isFinite(numValue)) {
+        return { value: numValue, unit: null };
+      }
+      
+      return { value: 0, unit: null };
     }
+
 
     getValueByCoordinates(row: number, col: number) {
         const r = this.cords2ref(row, col);
@@ -250,8 +260,9 @@ export class TableEvaluator {
                     return `${parsed.value} ${parsed.unit}`;
                 }
                 // Check if it's a number string
-                if (!isNaN(parseFloat(val)) && isFinite(parseFloat(val))) {
-                    return parseFloat(val);
+                const parsedNum = this.parseLocaleNumber(val); // ← Changed
+                if (!isNaN(parsedNum) && isFinite(parsedNum)) {
+                    return parsedNum;
                 }
                 // Return as quoted string for mathjs
                 return `"${val}"`;

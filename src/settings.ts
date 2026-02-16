@@ -8,6 +8,7 @@ export const DefaultSettings = {
 	showBorders: true,
 	digitGrouping: false,
 	groupingSeparator: ",",
+    decimalSeparator: ".",
 	formula_background_error_toggle: true,
 	formula_background_parents_toggle: true,
 	formula_background_children_toggle: true,
@@ -68,17 +69,51 @@ export class CalcCraftSettingsTab extends PluginSettingTab {
 					})
 			);
 
-		new Setting(containerEl)
-			.setName("Enable digit grouping")
-			.setDesc("Add thousands separators to large numbers (e.g., 1,234.56)")
-			.addToggle(toggle =>
-				toggle.setValue(this.plugin.settings.digitGrouping).onChange(async value => {
-					this.plugin.settings.digitGrouping = value;
-					await this.plugin.saveSettings();
-					this.display(); // Refresh to show/hide separator option
-					this.reloadPages();
-				})
-			);
+        new Setting(containerEl)
+          .setName("Enable digit grouping")
+          .setDesc("Add thousands separators to large numbers (e.g., 1,234.56)")
+          .addToggle(toggle =>
+            toggle.setValue(this.plugin.settings.digitGrouping).onChange(async value => {
+              this.plugin.settings.digitGrouping = value;
+              await this.plugin.saveSettings();
+              this.display(); // ← Refresh to show/hide grouping separator
+              this.reloadPages();
+            })
+          );
+
+        // Only show grouping separator when digit grouping is enabled
+        if (this.plugin.settings.digitGrouping) {
+          new Setting(containerEl)
+            .setName("Grouping separator") 
+            .setDesc("Character for thousands separator (e.g., ',' for 1,234 or '.' for 1.234 or ' ' for 1 234)")
+            .addText(text =>
+              text
+                .setPlaceholder(",")
+                .setValue(this.plugin.settings.groupingSeparator)
+                .onChange(async value => {
+                  this.plugin.settings.groupingSeparator = value || ",";
+                  await this.plugin.saveSettings();
+                  this.reloadPages();
+                })
+            );
+        }
+
+        // Always show decimal separator (used for both input and output)
+        new Setting(containerEl)
+          .setName("Decimal separator")
+          .setDesc("Character for decimal point (e.g., '.' for 3.14 or ',' for 3,14)")
+          .addText(text =>
+            text
+              .setPlaceholder(".")
+              .setValue(this.plugin.settings.decimalSeparator)
+              .onChange(async value => {
+                this.plugin.settings.decimalSeparator = value || ".";
+                await this.plugin.saveSettings();
+                this.reloadPages();
+              })
+          );
+
+
 
 		new Setting(containerEl)
 			.setName("show labels")

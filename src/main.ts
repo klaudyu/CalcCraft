@@ -192,7 +192,7 @@ export default class CalcCraftPlugin extends Plugin {
 
 				const gridData = this.extractTableGrid(tableEl);
 				const evaluator = new TableEvaluator();
-				const result = evaluator.evaluateTable(gridData);
+				const result = evaluator.evaluateTable(gridData, this.settings);
 
 				this.applyResultsToHTML(tableEl, result, gridData, evaluator);
 			} catch (error) {
@@ -372,30 +372,63 @@ export default class CalcCraftPlugin extends Plugin {
 
 
 
-	private formatNumber(num: number): string {
-		if (this.settings.digitGrouping) {
-			const options: Intl.NumberFormatOptions = { useGrouping: true };
+    private formatNumber(num: number): string {
+      let result: string;
+      
+      if (this.settings.digitGrouping) {
+        const options: Intl.NumberFormatOptions = { useGrouping: true };
+        
+        if (this.settings.precision >= 0) {
+          const decimalPart = String(num).split(".")[1];
+          if (decimalPart && decimalPart.length > this.settings.precision) {
+            options.minimumFractionDigits = this.settings.precision;
+            options.maximumFractionDigits = this.settings.precision;
+          }
+        }
+        
+        // Format with default separators first
+        result = new Intl.NumberFormat(undefined, options).format(num);
+      } else if (this.settings.precision >= 0) {
+        const decimalPart = String(num).split(".")[1];
+        if (decimalPart && decimalPart.length > this.settings.precision) {
+          result = num.toFixed(this.settings.precision);
+        } else {
+          result = num.toString();
+        }
+      } else {
+        result = num.toString();
+      }
+      
+      // Apply custom separators
+      const defaultDecimal = ".";
+      const defaultGrouping = ",";
+      const targetDecimal = this.settings.decimalSeparator || ".";
+      const targetGrouping = this.settings.groupingSeparator || ",";
+      
+      // Only replace if different from defaults
+      if (targetDecimal !== defaultDecimal || targetGrouping !== defaultGrouping) {
+        // Replace decimal separator (must do this first before touching grouping)
+        result = result.replace(defaultDecimal, "<<<DECIMAL>>>");
+        // Replace grouping separator
+        result = result.replace(new RegExp('\\' + defaultGrouping, 'g'), targetGrouping);
+        // Replace temporary decimal placeholder
+        result = result.replace("<<<DECIMAL>>>", targetDecimal);
+      }
+      
+      return result;
+    }
 
-			// Only set precision if it's enabled AND the number actually has decimals that exceed it
-			if (this.settings.precision >= 0) {
-				const decimalPart = String(num).split(".")[1];
-				if (decimalPart && decimalPart.length > this.settings.precision) {
-					options.minimumFractionDigits = this.settings.precision;
-					options.maximumFractionDigits = this.settings.precision;
-				}
-			}
 
-			return new Intl.NumberFormat(undefined, options).format(num);
-		} else if (this.settings.precision >= 0) {
-			const decimalPart = String(num).split(".")[1];
-			if (decimalPart && decimalPart.length > this.settings.precision) {
-				return num.toFixed(this.settings.precision);
-			}
-			return num.toString();
-		} else {
-			return num.toString();
-		}
-	}
+    private parseLocaleNumber(str: string): number {
+      const decimal = this.settings.decimalSeparator || ".";
+      const grouping = this.settings.groupingSeparator || ",";
+      
+      const normalized = String(str)
+        .replace(new RegExp('\\' + grouping.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '')
+        .replace(decimal, '.');
+      
+      return parseFloat(normalized);
+    }
 
 	private setFormattedCellValue(cellEl: HTMLElement, value: any, error?: string): void {
 		let data = value;
@@ -408,12 +441,11 @@ export default class CalcCraftPlugin extends Plugin {
 			if (this.settings.precision >= 0 || this.settings.digitGrouping) {
 				// Get the original string representation and extract the number part
 				const unitString = data.toString();
-				const unitMatch = unitString.match(/^(-?\d*\.?\d+)\s*(.*)$/);
-
-				if (unitMatch) {
-					const [, numberPart, unitPart] = unitMatch;
-					const num = parseFloat(numberPart);
-					const formattedNumber = this.formatNumber(num);
+                const unitMatch = unitString.match(/^(-?[\d,\.\s]+)\s*(.*)$/);
+                if (unitMatch) {
+                    const [, numberPart, unitPart] = unitMatch;
+                    const num = this.parseLocaleNumber(numberPart); // ← Changed
+                    const formattedNumber = this.formatNumber(num);
 					data = `${formattedNumber} ${unitPart}`;
 				} else {
 					data = unitString;
