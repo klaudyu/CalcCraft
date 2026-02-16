@@ -397,16 +397,16 @@ private formatNumber(num: number): string {
     if (this.settings.precision >= 0) {
         result = num.toFixed(this.settings.precision);
         
-        // Check if after removing trailing zeros, we'd get just "0"
-        const withoutZeros = result.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+        // Check if original number has more precision than displayed
+        const rounded = parseFloat(result);
+        const hasMorePrecision = rounded !== num;
         
-        // If result would be "0" but original number wasn't zero, keep zeros to show scale
-        if (withoutZeros === '0' && num !== 0) {
-            // Keep the zeros: "0.000"
-            result = result;
+        if (hasMorePrecision) {
+            // Number was truncated, keep zeros to show precision limit
+            // e.g., "3.000" for 3.0002342
         } else {
-            // Remove trailing zeros for normal cases
-            result = withoutZeros;
+            // Number is exact, remove trailing zeros
+            result = result.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
         }
     } else {
         result = num.toString();
@@ -414,6 +414,7 @@ private formatNumber(num: number): string {
     
     return this.applySeparators(result);
 }
+
 
 
 private applySeparators(numString: string): string {

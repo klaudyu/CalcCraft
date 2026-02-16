@@ -7,36 +7,31 @@ import { create, all } from 'mathjs';
 
 const math = create(all);
 
-// In table-evaluator.ts
+
 math.import({
     format: function(value: any, precision: number) {
         if (typeof value === 'number') {
             if (precision >= 0) {
-                let formatted = value.toFixed(precision);
+                const formatted = value.toFixed(precision);
                 
-                // Check if after removing trailing zeros, we'd lose all decimals
-                const withoutZeros = formatted.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+                // Check if the original number has more precision than what we're showing
+                // by comparing the rounded value with the original
+                const rounded = parseFloat(formatted);
+                const hasMorePrecision = rounded !== value;
                 
-                // If result is "0" but original number wasn't zero, keep the zeros to show scale
-                if (withoutZeros === '0' && value !== 0) {
-                    return formatted; // Keep "0.00000" to show it's very small
+                if (hasMorePrecision) {
+                    // Number was truncated/rounded, keep all zeros to show precision limit
+                    return formatted; // e.g., "3.000" for 3.0002342
+                } else {
+                    // Number is exact at this precision, remove trailing zeros
+                    return formatted.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
                 }
-                
-                // Remove trailing zeros for normal cases
-                return withoutZeros;
             }
             return value.toString();
         }
         return String(value);
     }
 }, { override: true });
-
-
-
-
-
-
-
 
 enum celltype {
     number = 1,

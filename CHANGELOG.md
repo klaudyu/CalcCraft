@@ -33,3 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.3.5] - 2026-02-16
 - isNumeric() fixed
+
+## [2.3.6] - 2026-02-16
+
+### Fixed
+- Display trailing zeros when value exceeds display precision ( e.g. for a precision of 3: 3.00005 -> 3.000 but 3.0000 -> 3)
+- format() takex precedence over the options (e.g. precision is set to 3 in options, but we have =format(1/3,5) -> 0.33333
