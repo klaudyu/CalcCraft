@@ -338,7 +338,7 @@ export class TableEvaluator {
     }
 
 
-    getValueByCoordinates(row: number, col: number) {
+    getValueByCoordinates(row: number, col: number, nullAsZero: boolean = true) {
         const r = this.cords2ref(row, col);
         this.debug(`getValueByCoordinates ${r}`);
 
@@ -346,7 +346,7 @@ export class TableEvaluator {
             this.debug(`getValueByCoordinates giving the value ${this.tableData[row][col]}`);
             const val = this.tableData[row][col];
 
-            if (val === null) return 0;
+            if (val === null) return nullAsZero ? 0 : null;
 
             // Handle unit values
             if (typeof val === "string") {
@@ -775,10 +775,13 @@ try {
                 this.parents[formulaRow][formulaCol].push([r, c]);
                 this.children[r][c].push([formulaRow, formulaCol]);
 
-                const val = this.getValueByCoordinates(r, c);
+                const val = this.getValueByCoordinates(r, c, false);
 
-                // For null values in matrices, use 0 to maintain matrix structure
-                //const matrixVal = val === null ? "null" : val;
+                // Only remove empty cells from ranges, not matrix (it would change the shape)
+                if (!matrix && val === null) { // Maybe skip configurable placeholders too? like settings.nullValues/skip = [null, "?","n/a"]
+                    continue;
+                }
+
                 colArray.push(val);
             }
             rowArray.push(colArray);
