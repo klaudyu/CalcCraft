@@ -378,10 +378,9 @@ export default class CalcCraftPlugin extends Plugin {
         // Label ALL rows (both thead and tbody)
         const allRows = Array.from(tableEl.rows);
         allRows.forEach((row, rowIndex) => {
-            const firstCell = row.cells[0];
-            if (firstCell && !firstCell.dataset.rowLabeled) {
-                firstCell.dataset.rowLabeled = 'true';
-                firstCell.dataset.rowNumber = String(rowIndex + 1);
+            if (!row.dataset.rowLabeled) {
+                row.dataset.rowLabeled = 'true';
+                row.dataset.rowNumber = String(rowIndex + 1);
             }
         });
     }
