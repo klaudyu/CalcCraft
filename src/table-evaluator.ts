@@ -306,7 +306,7 @@ export class TableEvaluator {
         return { value: this.parseLocaleNumber(cellContent), unit: null };
       }
 
-      const unitMatch = cellContent.trim().match(/^(-?[\d,\.\s]+)\s*([a-zA-Z]+.*)?$/);
+      const unitMatch = cellContent.trim().match(/^(-?[\d,\.\s]+(?:[eE][+-]?\d+)?)\s*([a-zA-Z]+.*)?$/);
       if (unitMatch) {
         const [, numberPart, unitPart] = unitMatch;
         const value = this.parseLocaleNumber(numberPart);
@@ -663,6 +663,7 @@ try {
                 const matchformula = restformula.match(/^[a-zA-Z]{3,}\(/);
 
                 const matchNum = restformula.match(/^\d+/);
+                const matchExp = restformula.match(/^(?:\d+(?:\.\d+)?|\.\d+)[eE][+-]?\d+/);
 
                 //const matchRange=restformula.match(/^[a-z]\d+:[a-z]\d+/); //normal range
                 //const matchRange = restformula.match(/^[a-z](?:\+|-)?\d+:[a-z](?:\+|-)?\d+/);
@@ -730,6 +731,10 @@ try {
                     ]);
                     results += matchformula[0] + res + ")";
                     i += matchformula[0].length + contentInsideParenthesis.length;
+                } else if (matchExp) {
+                    this.debug(`we matched an exponential number`);
+                    results += matchExp[0];
+                    i += matchExp[0].length - 1;
                 } else if (matchCell) {
                     this.debug(`we matched a cell`);
                     const ref = this.getValuebyReference(matchCell[0], formulaRow, formulaCol);

@@ -35,6 +35,8 @@ export const DefaultSettings = {
 	formula_font_children_dark: "#dcffa8",
 	enableClassFilter: false,
     requiredClass: "calccraft",
+	expThresholdLargeExponent: 9,
+	expThresholdSmallExponent: -4,
 };
 
 export class CalcCraftSettingsTab extends PluginSettingTab {
@@ -42,6 +44,10 @@ export class CalcCraftSettingsTab extends PluginSettingTab {
 
 	constructor(app: any, plugin: any) {
 		super(app, plugin);
+	}
+
+	hide(): void {
+		this.reloadPages();
 	}
 
 	display(): void {
@@ -65,7 +71,42 @@ export class CalcCraftSettingsTab extends PluginSettingTab {
 							this.plugin.settings.precision = numValue;
 						}
 						await this.plugin.saveSettings();
-						this.reloadPages();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Exponential notation (large numbers)")
+			.setDesc("Use exponential notation for numbers greater than or equal to 10^N (default: 9)")
+			.addText(text =>
+				text
+					.setPlaceholder("9")
+					.setValue(this.plugin.settings.expThresholdLargeExponent.toString())
+					.onChange(async value => {
+						const numValue = parseInt(value);
+						if (isNaN(numValue)) {
+							this.plugin.settings.expThresholdLargeExponent = 9;
+						} else {
+							this.plugin.settings.expThresholdLargeExponent = numValue;
+						}
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Exponential notation (small numbers)")
+			.setDesc("Use exponential notation for numbers less than or equal to 10^N (default: -4)")
+			.addText(text =>
+				text
+					.setPlaceholder("-4")
+					.setValue(this.plugin.settings.expThresholdSmallExponent.toString())
+					.onChange(async value => {
+						const numValue = parseInt(value);
+						if (isNaN(numValue)) {
+							this.plugin.settings.expThresholdSmallExponent = -4;
+						} else {
+							this.plugin.settings.expThresholdSmallExponent = numValue;
+						}
+						await this.plugin.saveSettings();
 					})
 			);
 
@@ -93,7 +134,6 @@ export class CalcCraftSettingsTab extends PluginSettingTab {
                 .onChange(async value => {
                   this.plugin.settings.groupingSeparator = value || ",";
                   await this.plugin.saveSettings();
-                  this.reloadPages();
                 })
             );
         }
@@ -109,7 +149,6 @@ export class CalcCraftSettingsTab extends PluginSettingTab {
               .onChange(async value => {
                 this.plugin.settings.decimalSeparator = value || ".";
                 await this.plugin.saveSettings();
-                this.reloadPages();
               })
           );
 
@@ -154,21 +193,15 @@ if (this.plugin.settings.enableClassFilter) {
     new Setting(containerEl)
         .setName("Required cssclass")
         .setDesc("Pages must have this cssclass in frontmatter to be processed")
-        .addText(text => {
+        .addText(text =>
             text
                 .setPlaceholder("calccraft")
                 .setValue(this.plugin.settings.requiredClass)
                 .onChange(async value => {
-                    // Save setting immediately but don't reload
                     this.plugin.settings.requiredClass = value || "calccraft";
                     await this.plugin.saveSettings();
-                });
-            
-            // Only reload pages when user finishes editing
-            text.inputEl.addEventListener('blur', () => {
-                this.reloadPages();
-            });
-        });
+                })
+        );
 }else {
         // Show disabled input when filter is off
         new Setting(containerEl)
