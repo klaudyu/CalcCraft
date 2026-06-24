@@ -393,23 +393,47 @@ export default class CalcCraftPlugin extends Plugin {
 private formatNumber(num: number): string {
     let result: string;
     
-    // Apply global precision
-    if (this.settings.precision >= 0) {
-        result = num.toFixed(this.settings.precision);
-        
-        // Check if original number has more precision than displayed
-        const rounded = parseFloat(result);
-        const hasMorePrecision = rounded !== num;
-        
-        if (hasMorePrecision) {
-            // Number was truncated, keep zeros to show precision limit
-            // e.g., "3.000" for 3.0002342
+    // Check if number should be formatted in exponential notation
+    const absNum = Math.abs(num);
+    const largeLimit = Math.pow(10, this.settings.expThresholdLargeExponent ?? 9);
+    const smallLimit = Math.pow(10, this.settings.expThresholdSmallExponent ?? -4);
+    
+    const useExponential = num !== 0 && (absNum >= largeLimit || absNum <= smallLimit);
+    
+    if (useExponential) {
+        if (this.settings.precision >= 0) {
+            result = num.toExponential(this.settings.precision);
+            
+            // Clean up trailing zeros if exact
+            const rounded = parseFloat(result);
+            const hasMorePrecision = rounded !== num;
+            if (!hasMorePrecision) {
+                result = result.replace(/(\.\d*?)0+(e[+-]?\d+)$/, '$1$2').replace(/\.(e[+-]?\d+)$/, '$1');
+            }
         } else {
-            // Number is exact, remove trailing zeros
-            result = result.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+            result = num.toExponential();
+            // Clean up trailing zeros if exact
+            result = result.replace(/(\.\d*?)0+(e[+-]?\d+)$/, '$1$2').replace(/\.(e[+-]?\d+)$/, '$1');
         }
     } else {
-        result = num.toString();
+        // Apply global precision (fixed-point)
+        if (this.settings.precision >= 0) {
+            result = num.toFixed(this.settings.precision);
+            
+            // Check if original number has more precision than displayed
+            const rounded = parseFloat(result);
+            const hasMorePrecision = rounded !== num;
+            
+            if (hasMorePrecision) {
+                // Number was truncated, keep zeros to show precision limit
+                // e.g., "3.000" for 3.0002342
+            } else {
+                // Number is exact, remove trailing zeros
+                result = result.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+            }
+        } else {
+            result = num.toString();
+        }
     }
     
     return this.applySeparators(result);
@@ -441,7 +465,7 @@ private setFormattedCellValue(cellEl: HTMLElement, value: any, error?: string): 
         (data.constructor?.name === "Unit" ||
         (data.value !== undefined && data.units !== undefined))) {
         const unitString = data.toString();
-        const unitMatch = unitString.match(/^(-?[\d\.]+)\s*(.*)$/);
+        const unitMatch = unitString.match(/^(-?[\d\.]+(?:[eE][+-]?\d+)?)\s*(.*)$/);
         if (unitMatch) {
             const [, numberPart, unitPart] = unitMatch;
             const formatted = this.applySeparators(numberPart);
@@ -456,12 +480,12 @@ private setFormattedCellValue(cellEl: HTMLElement, value: any, error?: string): 
     } 
     // Handle strings (from format() - already has precision applied)
     else if (typeof data === "string") {
-        const numMatch = data.match(/^(-?\d*\.?\d+)$/);
+        const numMatch = data.match(/^(-?\d*\.?\d+(?:[eE][+-]?\d+)?)$/);
         if (numMatch) {
             // String number from format() - ONLY apply separators, NO precision change
             data = this.applySeparators(data);
         } else {
-            const unitMatch = data.match(/^(-?\d*\.?\d+)\s*(.+)$/);
+            const unitMatch = data.match(/^(-?\d*\.?\d+(?:[eE][+-]?\d+)?)\s*(.+)$/);
             if (unitMatch) {
                 const [, numberPart, unitPart] = unitMatch;
                 data = this.applySeparators(numberPart) + ' ' + unitPart;
