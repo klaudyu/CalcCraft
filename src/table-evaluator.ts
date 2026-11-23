@@ -190,8 +190,8 @@ export class TableEvaluator {
                     this.cellstatus[rowIndex][colIndex] = cellstatus.iscomputed;
                     this.celltype[rowIndex][colIndex] = celltype.escaped_text;
                     this.tableData[rowIndex][colIndex] = cellContent.substring(1); // Remove '
-                } else if (cellContent.startsWith("=")) {
-                    // Formula cell
+                } else if (cellContent.startsWith("=") && !cellContent.startsWith("==")) {
+                    // Formula cell. Excludes "==" for highlight markdown
                     this.formulaData[rowIndex][colIndex] = cellContent;
                     this.cellstatus[rowIndex][colIndex] = cellstatus.none;
                     this.celltype[rowIndex][colIndex] = celltype.formula;
